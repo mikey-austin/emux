@@ -1,0 +1,7 @@
+*~
+*.tar.gz
+_build*
+*.bak
+Build
+blib
+MY*

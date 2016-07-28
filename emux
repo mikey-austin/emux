@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Emux::Server;
+use Emux::Config;
+use Getopt::Long;
+use Pod::Usage;
+
+my $options = {
+    daemonize => 0,
+    socket    => undef,
+    pidfile   => undef,
+    config    => undef,
+};
+
+my $help = 0;
+my $version = 0;
+my $config_file = '';
+
+GetOptions(
+    "daemonize|daemon|daemonise" => \$options->{daemonize},
+    "socket=s"                   => \$options->{socket},
+    "pidfile=s"                  => \$options->{pidfile},
+    "config=s"                   => \$config_file,
+    "help"                       => \$help,
+    "version"                    => \$version)
+    or pod2usage(1) and die("Error in command line arguments\n");
+
+if ($version) {
+    print 'Emux version ', Emux::Config::VERSION, "\n";
+    pod2usage(1);
+}
+
+if ($help) {
+    pod2usage(1);
+}
+
+my $config = Emux::Config->new($config_file)->merge($options);
+my $server = Emux::Server->new($config);
+eval {
+    $server->start;
+    1;
+} or do {
+    my $error = $@;
+    $server->shutdown($error)
+        if $error;
+};
