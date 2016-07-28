@@ -4,6 +4,18 @@ use strict;
 use warnings;
 
 use JSON;
+use constant {
+    DEFAULTS => {
+        daemonize => 0,
+        pidfile   => '/tmp/emux.pid',
+        logger    => 'stdout',
+        socket    => undef,
+        user      => undef,
+        group     => undef,
+        host      => undef,
+        port      => 9999
+    }
+};
 
 our $VERSION = '0.1';
 
@@ -36,6 +48,8 @@ sub merge {
         # Overwrite all other keys.
         $base_config->{$key} = $sub_config->{$key}
     }
+
+    return $self;
 }
 
 sub _set_defaults {
@@ -45,11 +59,8 @@ sub _set_defaults {
     # Sensible defaults go below to allow operation without
     # specifying a configuration file.
     #
-    %{$self->{_config}} = (
-        daemonize => 0,
-        socket    => '/tmp/emux.sock',
-        pidfile   => '/tmp/emux.pid'
-    );
+    my %defaults = %{+DEFAULTS};
+    $self->{_config} = \%defaults;
 }
 
 #
@@ -110,7 +121,12 @@ sub _parse_file {
 }
 
 sub get {
-    shift->{_config}->{$_[0]};
+    my ($self, @keys) = @_;
+    my @output;
+    push @output, $self->{_config}->{$_}
+        for @keys;
+
+    return wantarray ? @output : $output[0];
 }
 
 1;

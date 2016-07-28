@@ -5,16 +5,11 @@ use warnings;
 
 use Emux::Server;
 use Emux::Config;
+use Emux::Logger;
 use Getopt::Long;
 use Pod::Usage;
 
-my $options = {
-    daemonize => 0,
-    socket    => undef,
-    pidfile   => undef,
-    config    => undef,
-};
-
+my $options = Emux::Config::DEFAULTS;
 my $help = 0;
 my $version = 0;
 my $config_file = '';
@@ -23,13 +18,18 @@ GetOptions(
     "daemonize|daemon|daemonise" => \$options->{daemonize},
     "socket=s"                   => \$options->{socket},
     "pidfile=s"                  => \$options->{pidfile},
+    "user=s"                     => \$options->{user},
+    "group=s"                    => \$options->{group},
+    "host=s"                     => \$options->{host},
+    "port=s"                     => \$options->{port},
     "config=s"                   => \$config_file,
     "help"                       => \$help,
     "version"                    => \$version)
     or pod2usage(1) and die("Error in command line arguments\n");
 
+my $config = Emux::Config->new($config_file)->merge($options);
 if ($version) {
-    print 'Emux version ', Emux::Config::VERSION, "\n";
+    print 'Emux version ', $config->VERSION, "\n";
     pod2usage(1);
 }
 
@@ -37,8 +37,8 @@ if ($help) {
     pod2usage(1);
 }
 
-my $config = Emux::Config->new($config_file)->merge($options);
-my $server = Emux::Server->new($config);
+my $logger = Emux::Logger->new($config);
+my $server = Emux::Server->new($config, $logger);
 eval {
     $server->start;
     1;
