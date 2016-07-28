@@ -18,7 +18,7 @@ sub new {
     $self->_set_defaults;
     for (@{$self->{_files}}) {
         my $parsed = $self->_load_config($_);
-        $self->merge_config($parsed);
+        $self->merge($parsed);
     }
 
     return $self;
@@ -28,7 +28,7 @@ sub new {
 # Merge the parsed sub-configuration into the parsed
 # base configuration.
 #
-sub merge_config {
+sub merge {
     my ($self, $sub_config, $base_config) = @_;
 
     $base_config ||= $self->{_config};
@@ -75,13 +75,13 @@ sub _load_config {
         foreach my $file (@listing) {
             $sub_config = $self->_load_config(
                 $parsed->{include} . "/$file");
-            $self->merge_config($sub_config, $parsed);
+            $self->merge($sub_config, $parsed);
         }
     }
     elsif (defined $parsed->{include} and -e $parsed->{include}) {
         # We have an individual file.
         $sub_config = $self->_load_config($parsed->{include});
-        $self->merge_config($sub_config, $parsed);
+        $self->merge($sub_config, $parsed);
     }
 
     return $parsed;

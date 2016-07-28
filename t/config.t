@@ -18,7 +18,7 @@ my %custom = (
     socket    => '/tmp/sock2',
     daemonize => 1
 );
-$c->merge_config(\%custom);
+$c->merge(\%custom);
 ok($c->get('daemonize') == 1);
 ok($c->get('socket') eq '/tmp/sock2');
 ok($c->get('pidfile') eq '/tmp/emux.pid');
