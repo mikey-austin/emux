@@ -6,8 +6,8 @@ use warnings;
 use JSON;
 
 use constant {
-    TYPE_ERROR   => 'ERROR',
-    TYPE_EXECUTE => 'EXECUTE',
+    TYPE_ERROR   => 'error',
+    TYPE_EXECUTE => 'execute',
 };
 
 sub new {

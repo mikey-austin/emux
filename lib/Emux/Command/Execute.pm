@@ -5,6 +5,7 @@ use warnings;
 use parent qw(Emux::Command);
 
 sub execute {
+    my $self = shift;
     require Data::Dumper;
     print "running command " . Data::Dumper::Dumper($self->{_message}) . "\n";
 }

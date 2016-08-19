@@ -4,10 +4,11 @@ use strict;
 use warnings;
 
 sub new {
-    my ($class, $type, $message) = @_;
+    my ($class, $type, $server) = @_;
     bless {
         _type    => $type,
-        _message => $message || undef,
+        _message => undef,
+        _server  => $server,
     }, $class;
 }
 
@@ -22,8 +23,9 @@ sub execute {
 }
 
 sub output {
+    my $self = shift;
     return {
-        type => $self->{_type};
+        type => $self->{_type}
     };
 }
 

@@ -2,6 +2,7 @@ package Emux::CommandFactory;
 
 use strict;
 use warnings;
+use Module::Load qw(load);
 
 sub new {
     my ($class, $server) = @_;

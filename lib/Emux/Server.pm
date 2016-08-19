@@ -51,25 +51,32 @@ sub start {
         while (my @ready = $select->can_read) {
             foreach my $handle (@ready) {
                 if ($self->is_listener($handle)) {
-                    my $new = $handle->accept;
-                    $select->add($new);
+                    my $client = $handle->accept;
+                    my ($peer, $port) = ($client->peerhost, $client->peerport);
+                    $self->{_logger}->info("Accepted connection from $peer:$port");
+                    $select->add($client);
                 }
                 else {
-                    my ($response, $message);
-                    if (($message = Emux::Message->from_handle($handle, $self->{_cmd_factory}))
-                        and defined $message
-                        and defined $message->command)
-                    {
-                        $response = $message->command->execute;
+                    my ($response, $message, $error);
+                    eval {
+                        if (($message = Emux::Message->from_handle($handle, $self->{_cmd_factory}))
+                            and defined $message
+                            and defined $message->command)
+                        {
+                            $response = $message->command->execute;
+                        }
+                        1;
+                    } or do {
+                        $error = $@;
+                    };
+
+                    if ($error) {
+                        $self->{_logger}->err("Error processing message: $error");
                     }
-                    else {
+                    elsif (defined $message or not defined $message->command) {
                         $self->{_logger}->err('could not understand message');
-                        $response = Emux::Message->new(
-                            Emux::Message->TYPE_ERROR, $self->{_cmd_factory});
-                        $response->body('invalid message');
                     }
 
-                    print $handle $response->encode;
                     $select->remove($handle);
                     $handle->close;
                 }
