@@ -52,18 +52,25 @@ sub start {
             foreach my $handle (@ready) {
                 if ($self->is_listener($handle)) {
                     my $client = $handle->accept;
-                    my ($peer, $port) = ($client->peerhost, $client->peerport);
-                    $self->{_logger}->info("Accepted connection from $peer:$port");
+                    my $from;
+                    if ($client->can('peerhost')) {
+                        my ($peer, $port) = ($client->peerhost, $client->peerport);
+                        $from = "$peer:$port";
+                    }
+                    elsif ($client->can('hostpath')) {
+                        $from = $client->hostpath;
+                    }
+                    $self->{_logger}->info("Accepted connection from $from");
                     $select->add($client);
                 }
                 else {
-                    my ($response, $message, $error);
+                    my ($message, $error);
                     eval {
                         if (($message = Emux::Message->from_handle($handle, $self->{_cmd_factory}))
                             and defined $message
                             and defined $message->command)
                         {
-                            $response = $message->command->execute;
+                            $message->command->execute;
                         }
                         1;
                     } or do {
@@ -71,9 +78,9 @@ sub start {
                     };
 
                     if ($error) {
-                        $self->{_logger}->err("Error processing message: $error");
+                        $self->{_logger}->err("error processing message: $error");
                     }
-                    elsif (defined $message or not defined $message->command) {
+                    elsif (not (defined $message and defined $message->command)) {
                         $self->{_logger}->err('could not understand message');
                     }
 

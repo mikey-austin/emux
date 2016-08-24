@@ -12,6 +12,10 @@ use constant {
 
 sub new {
     my ($class, $type, $factory) = @_;
+
+    die 'type parameter is required'
+        if not defined $type;
+
     my $self = {
         _type    => $type,
         _command => $factory ? $factory->create($type) : undef,
