@@ -20,22 +20,17 @@ sub new {
         $self->{_syslog} = 1;
     }
 
+    foreach my $level (qw/err warn info debug/) {
+        no strict 'refs';
+        *{"$class::$level"} = sub {
+            my $self = shift;
+            my $format = shift;
+            my $message = @_ > 0 ? sprintf($format, @_) : $format;
+            return $self->log_message($message, $level);
+        } if not defined *{"$class::$level"}{CODE};
+    }
+
     return $self;
-}
-
-sub err {
-    my ($self, $message) = @_;
-    return $self->log_message($message, 'err');
-}
-
-sub debug {
-    my ($self, $message) = @_;
-    return $self->log_message($message, 'debug');
-}
-
-sub info {
-    my ($self, $message) = @_;
-    return $self->log_message($message, 'info');
 }
 
 sub log_message {
