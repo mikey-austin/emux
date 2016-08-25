@@ -5,6 +5,7 @@ use warnings;
 
 use Emux::Message;
 use Emux::CommandFactory;
+use Emux::ProcessManager;
 use IO::Select;
 use IO::Handle;
 use IO::Socket::INET;
@@ -23,6 +24,10 @@ sub new {
     bless $self, $class;
 
     $self->{_cmd_factory} = Emux::CommandFactory->new($self);
+    $self->{_proc_manager} = Emux::ProcessManager->new(
+        config => $config,
+        logger => $logger,
+    );
 
     return $self;
 }
@@ -66,12 +71,8 @@ sub start {
                 else {
                     my ($message, $error);
                     eval {
-                        if (($message = Emux::Message->from_handle($handle, $self->{_cmd_factory}))
-                            and defined $message
-                            and defined $message->command)
-                        {
-                            $message->command->execute;
-                        }
+                        $message = Emux::Message->from_handle($handle, $self->{_cmd_factory});
+                        $message->command->execute;
                         1;
                     } or do {
                         $error = $@;
@@ -134,6 +135,10 @@ sub register_listeners {
 sub is_listener {
     my ($self, $fh) = @_;
     any { $_ == $fh } @{$self->{_listeners}};
+}
+
+sub proc_manager {
+    shift->{_proc_manager};
 }
 
 sub daemonize {

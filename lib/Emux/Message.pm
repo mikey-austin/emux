@@ -6,8 +6,9 @@ use warnings;
 use JSON;
 
 use constant {
-    TYPE_ERROR   => 'error',
-    TYPE_EXECUTE => 'execute',
+    TYPE_EXECUTE  => 'execute',
+    TYPE_OUTPUT   => 'output',
+    TYPE_FINISHED => 'finished',
 };
 
 sub new {
@@ -23,9 +24,7 @@ sub new {
     };
     bless $self, $class;
 
-    if (defined $self->{_command}) {
-        $self->{_command}->message($self);
-    }
+    $self->{_command}->message($self);
 
     # Set some getter/setters directly in symbol table.
     foreach my $var (qw/type command body/) {

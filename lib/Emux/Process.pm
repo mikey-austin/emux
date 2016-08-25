@@ -30,13 +30,13 @@ sub new {
 
 sub run {
     my $self = shift;
-    $self->{_on_run}->($self)
+    $self->{_on_run}->(@_)
         if defined $self->{_on_run};
 }
 
 sub on_exit {
     my $self = shift;
-    $self->{_on_exit}->($self)
+    $self->{_on_exit}->(@_)
         if defined $self->{_on_exit};
 }
 
