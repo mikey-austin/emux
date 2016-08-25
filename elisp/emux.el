@@ -207,7 +207,7 @@
 
 (defun emux-start-client (path)
   (setf emux--process (make-network-process :name "emux"
-                                            :bufer (get-buffer-create "emux")
+                                            :bufer (get-buffer-create "*emux*")
                                             :filter 'emux--process-filter
                                             :remote path)))
 
