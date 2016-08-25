@@ -119,7 +119,7 @@
                  (format "%S is not a known spec" name)))
 
 (defun emux--normalize-spec-sexp (spec-s)
-  (cond ((symbolp spec-s) (list (spec-s)))
+  (cond ((symbolp spec-s) (list spec-s))
         ((null (cdr spec-s)) (emux--normalize-spec-sexp (car spec-s)))
         (t spec-s)))
 
@@ -134,12 +134,57 @@
                (emux--result-error (format "Spec %S has arity %i and can't be used with %S as arguments"
                                            name arity arg-list)))
               ((= arity 0) (emux--result-ok func))
-              (t (emux--result-do (args (emux--result-seq (mapcar 'emux--getfield-type-unwrapped arg-list)))
+              (t (emux--result-do (args (emux--result-seq (mapcar 'emux--getspec-func arg-list)))
                    (emux--result-ok (emux--partial-apply func args)))))))))
 
 (defun emux--getspec-pred (spec-s)
   (emux--result-do (f (emux--getspec-func spec-s))
     (emux--result-ok (emux--partial-funcall 'emux--spec-wrap-predicate spec-s f))))
+
+(defvar emux--response-type-table (make-hash-table :test 'equal))
+
+(defun emux--validate-apply (args-and-specs func obj)
+  (emux--result-do (values (emux--result-seq (mapcar (lambda (x)
+                                                       (emux--funcall (cdr x) (cdr (assoc (car x) obj))))
+                                                     args-and-specs)))
+    (emux--result-ok (emux--apply func values))))
+
+(defun emux--extract-arg-name-and-spec (x)
+  (let ((name (symbol-name (car x)))
+        (spec-s (cadr x)))
+    (emux--result-do (spec (emux--getspec-pred spec-s))
+      (emux--result-ok (cons name spec)))))
+
+(defun emux--make-args-and-specs (arg-list)
+  (emux--result-seq (mapcar 'emux--extract-arg-name-and-spec arg-list)))
+
+(defmacro emux--defresponse-type (name args &rest body)
+  (let* ((args-and-specs (cl-gensym))
+         (arg-names (mapcar 'car args))
+         (func `(lambda ,arg-names ,@body)))
+    `(emux--result-do (,args-and-specs (emux--make-args-and-specs ',args))
+       (puthash (symbol-name ',name)
+                (emux--partial-funcall 'emux--validate-apply ,args-and-specs ,func)
+                emux--response-type-table))))
+(put 'emux--defresponse-type 'lisp-indent-function 2)
+
+(defun emux--json-decode (json-str)
+  (let* ((json-array-type 'vector)
+         (json-key-type 'string)
+         (json-object-type 'alist))
+    (condition-case err
+        (let ((obj (json-read-from-string json-str)))
+          (emux--result-ok obj))
+      (error (emux--result-error err)))))
+
+(defun emux--process-filter (process output)
+  (emux--result-do (alist (emux--json-decode output))
+    (let ((handler (gethash (cdr (assoc "type" alist)) emux--response-type-table)))
+      (if handler
+          (emux--result-match (val (emux--funcall handler alist))
+            (:ok t)
+            (:error (error val)))
+        (error "unknown type")))))
 
 (emux--defspec string () data
   (stringp data))
@@ -150,15 +195,21 @@
 
 (emux--defspec option (a) data
   (or (not data)
-      (funcall a data)))
+      (emux--funcall a data)))
+
+(emux--defresponse-type output ((id string) (tags (option (vector string))) (content string))
+  (print id)
+  (print tags)
+  (print content))
+
 
 (defvar emux--process nil)
 
 (defun emux-start-client (path)
   (setf emux--process (make-network-process :name "emux"
                                             :bufer (get-buffer-create "emux")
-                                            :remote path
-                                            :filter #'emux--process-filter)))
+                                            :filter 'emux--process-filter
+                                            :remote path)))
 
 (defun emux-finish-client ()
   (delete-process emux--process))
@@ -174,9 +225,3 @@
                                                    :id id
                                                    :machine machine
                                                    :tags tags)))
-
-(unless (emux-running?)
-  (emux-start-client "/home/raphael/work/emux/sock_test"))
-
-(if (emux-running?)
-    (emux-command "app" "ls" "id" '()))
