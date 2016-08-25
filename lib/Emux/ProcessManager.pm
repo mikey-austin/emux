@@ -3,7 +3,7 @@ package Emux::ProcessManager;
 use strict;
 use warnings;
 
-use POSIX;
+use POSIX qw(:sys_wait_h :unistd_h);
 use Socket;
 use IO::Handle;
 use Emux::Process;
@@ -35,15 +35,14 @@ sub run_process {
     my ($pid, $fh) = $self->_fork(
         routine => sub {
             my $fh = shift;
-            # Setup stdout & stdin.
+            # Setup stdout & stdin to be over the supplied filehandle.
             if (defined $fh) {
-                # close(STDOUT);
-                # close(STDIN);
-                # open(STDOUT, \$fh);
-                # open(STDIN, \$fh);
+                dup2(fileno($fh), STDIN_FILENO);
+                dup2(fileno($fh), STDOUT_FILENO);
             }
             $self->{_logger}->debug('running process id %s', $process->id);
             $process->run;
+            $process->on_exit;
         }
     );
     $process->pid($pid);
@@ -53,6 +52,12 @@ sub run_process {
 
 sub stop_process {
     my ($self, $process) = @_;
+
+    $self->{_logger}->warn(
+        'stopping process %s with pid %s',
+        $process->id,
+        $process->pid
+    );
     kill 'TERM', $process->pid;
 }
 
@@ -78,7 +83,7 @@ sub _deregister_process {
     my ($self, $process) = @_;
 
     $self->{_logger}->debug(
-        'deregistering process id %s; %s', $process->id, $process->pid);
+        'de-registering process id %s; %s', $process->id, $process->pid);
     delete $self->{_procs}->{id}->{$process->id};
     delete $self->{_procs}->{pid}->{$process->pid};
     delete $self->{_masters}->{$process->host}->{procs}->{$process->id};
@@ -103,7 +108,12 @@ sub _register_master {
     # Fork master ssh process.
     my $pid = $self->_fork(
         routine => sub {
-            $self->{_logger}->debug("starting master connection; $master");
+            $self->{_logger}->debug(
+                "starting master $master; %s %s %s %s",
+                'ssh', '-TM',
+                $self->{_master_opts},
+                $master
+            );
             system(
                 'ssh', '-TM',          # Master mode with no tty.
                 $self->{_master_opts}, # Custom options.
@@ -123,7 +133,7 @@ sub _register_master {
 sub _deregister_master {
     my ($self, $master) = @_;
 
-    $self->{_logger}->debug('deregistering master %s', $master);
+    $self->{_logger}->debug('de-registering master %s', $master);
     delete $self->{_masters_by_pid}->{$self->{_masters}->{$master}->{pid}};
     delete $self->{_masters}->{$master};
 }
@@ -131,6 +141,11 @@ sub _deregister_master {
 sub _stop_master {
     my ($self, $master) = @_;
     kill 'TERM', $self->{_masters}->{$master}->{pid};
+    $self->{_logger}->warn(
+        'sent SIGTERM to master %s with pid %s',
+        $master,
+        $self->{_masters}->{$master}->{pid}
+    );
 }
 
 sub _fork {
@@ -157,7 +172,6 @@ sub _fork {
         }
         $SIG{'CHLD'} = 'IGNORE';
         $args{routine}->($child_handle);
-        $self->{_logger}->warn("fork command finished");
         exit(0);
     }
     elsif(not defined $pid) {
@@ -177,10 +191,9 @@ sub _register_signals {
 
     $SIG{'CHLD'} = sub {
         my $pid;
-        do {
-            $pid = waitpid(-1, POSIX::WNOHANG);
-            my $exit_status = POSIX::WEXITSTATUS($?);
-            $self->{_logger}->debug("SIGCHLD received for $pid; exited with $exit_status");
+        for ($pid = waitpid(-1, WNOHANG); $pid > 0; $pid = waitpid(-1, WNOHANG)) {
+            my $exit_status = WEXITSTATUS($?);
+            $self->{_logger}->debug("in SIGCHLD; $pid exited with $exit_status");
 
             if ($self->{_procs}->{pid}->{$pid}) {
                 my $process = $self->{_procs}->{pid}->{$pid};
@@ -194,7 +207,7 @@ sub _register_signals {
                 $self->{_logger}->warn("unknown process $pid exited with $exit_status");
             }
 
-        } while($pid > 0);
+        }
     };
 }
 

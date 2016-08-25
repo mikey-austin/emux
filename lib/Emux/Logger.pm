@@ -44,7 +44,7 @@ sub log_message {
     }
     else {
         my $timestamp = strftime "%F %T", localtime;
-        print STDERR "[$timestamp]: $message\n";
+        print STDERR "[$timestamp $$]: $message\n";
     }
 
     return $message;

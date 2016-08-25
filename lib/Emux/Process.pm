@@ -6,12 +6,12 @@ use warnings;
 sub new {
     my ($class, %args) = @_;
     my $self = {
-        _id         => $args{id},
-        _host       => $args{host} || 'localhost',
-        _on_run     => $args{on_run},
-        _on_destroy => $args{on_destroy},
-        _pid        => undef,
-        _fh         => undef, # The parent filehandle
+        _id      => $args{id},
+        _host    => $args{host} || 'localhost',
+        _on_run  => $args{on_run},
+        _on_exit => $args{on_exit},
+        _pid     => undef,
+        _fh      => undef, # The parent filehandle
     };
     bless $self, $class;
 
@@ -34,10 +34,10 @@ sub run {
         if defined $self->{_on_run};
 }
 
-sub DESTROY {
+sub on_exit {
     my $self = shift;
-    $self->{_on_destroy}->($self)
-        if defined $self->{_on_destroy};
+    $self->{_on_exit}->($self)
+        if defined $self->{_on_exit};
 }
 
 1;
