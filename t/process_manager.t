@@ -96,6 +96,8 @@ ok(@masters == 0, 'master cleaned up correctly');
 @procs = $pm->procs;
 ok(@procs == 0, 'processes cleaned up correctly');
 
+$SIG{'CHLD'} = 'IGNORE';
+
 # Make our own sleep as the builtin has issues with our forking.
 sub my_sleep {
     my $end = Time::HiRes::time() + shift();

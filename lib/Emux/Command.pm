@@ -18,15 +18,14 @@ sub message {
     return $self->{_message};
 }
 
-sub execute {
-    # Noop.
+sub server {
+    my ($self, $server) = @_;
+    $self->{_server} = $server if defined $server;
+    return $self->{_server};
 }
 
-sub output {
-    my $self = shift;
-    return {
-        type => $self->{_type}
-    };
+sub execute {
+    ...
 }
 
 1;

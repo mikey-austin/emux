@@ -28,15 +28,21 @@ sub new {
     return $self;
 }
 
+#
+# This is run after forking in the child.
+#
 sub run {
     my $self = shift;
-    $self->{_on_run}->($self)
+    $self->{_on_run}->(@_)
         if defined $self->{_on_run};
 }
 
+#
+# This is run in the parent.
+#
 sub on_exit {
     my $self = shift;
-    $self->{_on_exit}->($self)
+    $self->{_on_exit}->($self, @_)
         if defined $self->{_on_exit};
 }
 

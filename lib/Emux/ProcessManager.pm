@@ -42,7 +42,6 @@ sub run_process {
             }
             $self->{_logger}->debug('running process id %s', $process->id);
             $process->run;
-            $process->on_exit;
         }
     );
     $process->pid($pid);
@@ -114,11 +113,7 @@ sub _register_master {
                 $self->{_master_opts},
                 $master
             );
-            system(
-                'ssh', '-TM',          # Master mode with no tty.
-                $self->{_master_opts}, # Custom options.
-                $master,               # Remote host.
-            );
+            exec "/usr/bin/ssh -TM $self->{_master_opts} $master";
         }
     );
 
@@ -140,12 +135,15 @@ sub _deregister_master {
 
 sub _stop_master {
     my ($self, $master) = @_;
-    kill 'TERM', $self->{_masters}->{$master}->{pid};
-    $self->{_logger}->warn(
-        'sent SIGTERM to master %s with pid %s',
-        $master,
-        $self->{_masters}->{$master}->{pid}
-    );
+
+    if (defined $self->{_masters}->{$master}->{pid}) {
+        kill 'TERM', $self->{_masters}->{$master}->{pid};
+        $self->{_logger}->warn(
+            'sent SIGTERM to master %s with pid %s',
+            $master,
+            $self->{_masters}->{$master}->{pid}
+        );
+    }
 }
 
 sub _fork {
@@ -197,11 +195,24 @@ sub _register_signals {
 
             if ($self->{_procs}->{pid}->{$pid}) {
                 my $process = $self->{_procs}->{pid}->{$pid};
-                $self->_deregister_process($process);
+                eval {
+                    $self->_deregister_process($process);
+                    $process->on_exit($exit_status);
+                    1;
+                } or do {
+                    my $error = $@;
+                    $self->{_logger}->err(
+                        'error in %s on_exit handler; %s', $process->id, $error);
+                };
             }
             elsif ($self->{_masters_by_pid}->{$pid}) {
                 my $master = $self->{_masters_by_pid}->{$pid};
-                $self->_deregister_master($master->{host});
+                eval {
+                    $self->_deregister_master($master->{host});
+                } or do {
+                    my $error = $@;
+                    $self->{_logger}->err('error deregistering master; %s', $error);
+                };
             }
             else {
                 $self->{_logger}->warn("unknown process $pid exited with $exit_status");

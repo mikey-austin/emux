@@ -19,8 +19,14 @@ sub create {
     if ($type eq Emux::Message->TYPE_EXECUTE) {
         $class = 'Execute';
     }
+    elsif ($type eq Emux::Message->TYPE_OUTPUT) {
+        $class = 'Output';
+    }
+    elsif ($type eq Emux::Message->TYPE_FINISHED) {
+        $class = 'Finished';
+    }
     else {
-        $class = 'Error';
+        die "could not make command of type $type";
     }
 
     my $abs_class = "${namespace}${class}";

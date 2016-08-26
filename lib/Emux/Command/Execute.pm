@@ -4,19 +4,33 @@ use strict;
 use warnings;
 use parent qw(Emux::Command);
 
+use Emux::Process;
+
 sub execute {
     my $self = shift;
-    require Data::Dumper;
-    print "running command " . Data::Dumper::Dumper($self->{_message}) . "\n";
-}
 
-sub output {
-    my $self = shift;
+    my $message = $self->message;
+    $self->{_command} = $message->{_body}->{command}
+        or die 'command required';
+    $self->{_id} = $message->{_body}->{id}
+        or die 'id required';
+    $self->{_host} = $message->{_body}->{host} || 'localhost';
+    $self->{_tags} = $message->{_body}->{tags} || [];
 
-    my $output = $self->SUPER::output;
-    $output->{message} = $self->{_message}->body;
+    my $process = Emux::Process->new(
+        id     => $self->{_id},
+        host   => $self->{_host},
+        on_run => sub {
+            exec "/usr/bin/ssh -qt $self->{_host} '$self->{_command} && sleep 5'";
+        },
+        on_exit => sub {
+            my ($process, $exit_status) = @_;
+            $self->server->deregister_process(
+                $process, $exit_status);
+        }
+    );
 
-    return $output;
+    $self->server->register_process($process);
 }
 
 1;
