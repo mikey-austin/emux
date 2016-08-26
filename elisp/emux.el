@@ -4,6 +4,7 @@
 
 (defvar emux--process-name "emux")
 (defvar emux-path "emux")
+(defconst emux-log-buffer-name "*emux-logs*")
 
 (cl-defstruct emux--closure
   vars
@@ -178,14 +179,23 @@
       (error (emux--result-error err)))))
 
 (defun emux--process-filter (process output)
-  (emux--result-match (alist-val (emux--json-decode output))
-    (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
-           (if handler
-               (emux--result-match (val (emux--funcall handler alist-val))
-                 (:ok t)
-                 (:error (warn val)))
-             (warn "unknown type"))))
-    (:error (warn alist-val))))
+  (let ((lines (split-string output "\n")))
+    (cl-loop for l in lines
+             do (if (string-prefix-p "{" l)
+                    (emux--result-match (alist-val (emux--json-decode l))
+                      (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
+                             (if handler
+                                 (emux--result-match (val (emux--funcall handler alist-val))
+                                   (:ok t)
+                                   (:error (warn val)))
+                               (warn "unknown type"))))
+                      (:error (warn alist-val)))
+                  (emux--add-log l)))))
+
+(defun emux--add-log (line)
+  (with-current-buffer (get-buffer-create emux-log-buffer-name)
+    (insert line)
+    (newline)))
 
 (defun emux--send-message (args)
   (process-send-string emux--process-name
