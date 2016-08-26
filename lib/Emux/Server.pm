@@ -22,6 +22,7 @@ sub new {
         _logger    => $logger,
         _listeners => [],
         _procs     => {},
+        _clients   => [ *STDOUT ],
         _select    => IO::Select->new,
     };
     bless $self, $class;
@@ -68,21 +69,21 @@ sub start {
                     }
                     $self->{_logger}->info("Accepted connection from $from");
                     $self->{_select}->add($client);
+                    push @{$self->{_clients}}, $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
                     # Read output and broadcast output message in chunks.
                     my ($line, $output);
-                    $self->{_select}->remove($handle);
                     my $select = IO::Select->new($handle);
                     do {
+                        local $/;
                         $line = readline($handle);
                         $output .= $line
                             if $line;
-                    } while($select->can_read(1));
-                    $select = undef;
+                    } while($line and $select->can_read(1));
                     next if not $output;
 
-                    my $process = $self->{_procs}->{$handle};
+                    my $process = $self->{_procs}->{"$handle"};
                     my $message = Emux::Message->new(TYPE_OUTPUT);
                     $message->body({
                         id      => $process->id,
@@ -90,7 +91,6 @@ sub start {
                         content => $output,
                     });
                     $self->broadcast_message($message);
-                    $self->{_select}->add($handle);
                 }
                 else {
                     my ($message, $error);
@@ -160,7 +160,7 @@ sub register_listeners {
 
 sub is_listener {
     my ($self, $fh) = @_;
-    any { $_ == $fh } @{$self->{_listeners}};
+    any { fileno($_) == fileno($fh) } @{$self->{_listeners}};
 }
 
 sub proc_manager {
@@ -171,13 +171,13 @@ sub register_process {
     my ($self, $process) = @_;
     $self->{_proc_manager}->run_process($process);
     $self->{_select}->add($process->fh);
-    $self->{_procs}->{$process->fh} = $process;
+    $self->{_procs}->{"@{[$process->fh]}"} = $process;
 }
 
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
-    delete $self->{_procs}->{$process->fh};
+    delete $self->{_procs}->{"@{[$process->fh]}"};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -195,9 +195,8 @@ sub is_proc_fh {
 
 sub broadcast_message {
     my ($self, $message) = @_;
-
-    # Broadcast to all connected clients.
-    print $message->encode, "\n";
+    printf { $_ } "%s\n", $message->encode
+        foreach @{$self->{_clients}};
 }
 
 sub daemonize {
