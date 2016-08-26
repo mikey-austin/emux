@@ -250,7 +250,7 @@
       (emux--funcall a data)))
 
 (emux--defresponse-type output ((id string) (content string))
-  (emux--write-to-emux-buffer content))
+  (emux--write-to-emux-buffer id content))
 
 (emux--defresponse-type finished ((id string) (exit_code integer)))
 
@@ -259,13 +259,14 @@
                                 (machine (option string))
                                 (tags (option (vector string)))))
 
-(defun emux--write-to-emux-buffer (content)
+(defun emux--write-to-emux-buffer (section content)
   (let ((proc (get-process emux--process-name)))
     (when (buffer-live-p (process-buffer proc))
       (with-current-buffer (process-buffer proc)
         (let ((moving (= (point) (process-mark proc))))
           (save-excursion
             (goto-char (process-mark proc))
+            (insert (concat "\n=== " section " ===\n"))
             (insert content)
             (set-marker (process-mark proc) (point)))
           (if moving (goto-char (process-mark proc))))))))
@@ -273,7 +274,7 @@
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (if (null id)
       (emux--add-log content)
-    (emux--write-to-emux-buffer content)))
+    (emux--write-to-emux-buffer (concat id " (stderr)") content)))
 
 (emux--defmessage-type state ())
 
