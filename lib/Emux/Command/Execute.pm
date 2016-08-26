@@ -14,7 +14,7 @@ sub execute {
         or die 'command required';
     $self->{_id} = $message->{_body}->{id}
         or die 'id required';
-    $self->{_host} = $message->{_body}->{host} || 'localhost';
+    $self->{_host} = $message->{_body}->{machine} || 'localhost';
     $self->{_tags} = $message->{_body}->{tags} || [];
 
     my $process = Emux::Process->new(

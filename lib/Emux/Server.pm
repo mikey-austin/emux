@@ -22,6 +22,7 @@ sub new {
         _logger    => $logger,
         _listeners => [],
         _procs     => {},
+        _clients   => [ *STDOUT ],
         _select    => IO::Select->new,
     };
     bless $self, $class;
@@ -68,6 +69,7 @@ sub start {
                     }
                     $self->{_logger}->info("Accepted connection from $from");
                     $self->{_select}->add($client);
+                    push @{$self->{_clients}}, $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
                     # Read output and broadcast output message in chunks.
@@ -160,7 +162,7 @@ sub register_listeners {
 
 sub is_listener {
     my ($self, $fh) = @_;
-    any { $_ == $fh } @{$self->{_listeners}};
+    any { fileno($_) == fileno($fh) } @{$self->{_listeners}};
 }
 
 sub proc_manager {
@@ -195,9 +197,8 @@ sub is_proc_fh {
 
 sub broadcast_message {
     my ($self, $message) = @_;
-
-    # Broadcast to all connected clients.
-    print $message->encode, "\n";
+    printf { $_ } "%s\n", $message->encode
+        foreach @{$self->{_clients}};
 }
 
 sub daemonize {
