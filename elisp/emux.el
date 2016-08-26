@@ -257,6 +257,11 @@
                                 (machine (option string))
                                 (tags (option (vector string)))))
 
+(emux--defmessage-type state ())
+
+(emux--defmessage-type mute ((id (option (vector string)))
+                             (tags (option (vector string)))))
+
 (defun emux-start-client (&optional path)
   (when (emux-running?)
     (emux-finish-client))
