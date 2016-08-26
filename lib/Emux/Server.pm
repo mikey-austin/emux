@@ -3,13 +3,14 @@ package Emux::Server;
 use strict;
 use warnings;
 
-use Emux::Message;
+use Emux::Message qw(:constants);
 use Emux::CommandFactory;
 use Emux::ProcessManager;
 use IO::Select;
 use IO::Handle;
 use IO::Socket::INET;
 use IO::Socket::UNIX;
+use MIME::Base64 qw(encode_base64);
 use List::Util qw(any);
 use POSIX ();
 
@@ -19,7 +20,9 @@ sub new {
         _pid       => undef,
         _config    => $config,
         _logger    => $logger,
-        _listeners => []
+        _listeners => [],
+        _procs     => {},
+        _select    => IO::Select->new,
     };
     bless $self, $class;
 
@@ -48,12 +51,10 @@ sub start {
         if $self->{_config}->get('daemonize');
     $self->save_pid;
     $self->register_signals;
-
-    my $select = IO::Select->new();
-    $self->register_listeners($select);
+    $self->register_listeners;
 
     for (;;) {
-        while (my @ready = $select->can_read) {
+        while (my @ready = $self->{_select}->can_read) {
             foreach my $handle (@ready) {
                 if ($self->is_listener($handle)) {
                     my $client = $handle->accept;
@@ -66,7 +67,27 @@ sub start {
                         $from = $client->hostpath;
                     }
                     $self->{_logger}->info("Accepted connection from $from");
-                    $select->add($client);
+                    $self->{_select}->add($client);
+                }
+                elsif ($self->is_proc_fh($handle)) {
+                    # Read output and broadcast output message in chunks.
+                    my ($line, $output);
+                    my $select = IO::Select->new($handle);
+                    do {
+                        $line = readline($handle);
+                        $output .= $line
+                            if $line;
+                    } while($select->can_read(1));
+                    next if not $output;
+
+                    my $process = $self->{_procs}->{$handle};
+                    my $message = Emux::Message->new(TYPE_OUTPUT);
+                    $message->body({
+                        id      => $process->id,
+                        #content => base64_encode($output),
+                        content => $output,
+                    });
+                    $self->broadcast_message($message);
                 }
                 else {
                     my ($message, $error);
@@ -85,8 +106,8 @@ sub start {
                         $self->{_logger}->err('could not understand message');
                     }
 
-                    $select->remove($handle);
-                    $handle->close;
+                    $self->{_select}->remove($handle);
+                    #$handle->close;
                 }
             }
         }
@@ -96,10 +117,10 @@ sub start {
 }
 
 sub register_listeners {
-    my ($self, $select) = @_;
+    my $self = shift;
 
     unless ($self->{_config}->get('daemonize')) {
-        $select->add(*STDIN);
+        $self->{_select}->add(*STDIN);
         $self->{_logger}->info("Listening on STDIN");
     }
 
@@ -109,7 +130,7 @@ sub register_listeners {
             Type   => SOCK_STREAM,
             Listen => 5,
         ) or die "Could not initialize socket at $socket: $!";
-        $select->add($fh);
+        $self->{_select}->add($fh);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $socket");
     }
@@ -126,7 +147,7 @@ sub register_listeners {
             Listen    => 5,
             Type      => SOCK_STREAM,
         ) or die "Could not bind at address $host:$port: $!\n";
-        $select->add($fh);
+        $self->{_select}->add($fh);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $host:$port");
     }
@@ -139,6 +160,39 @@ sub is_listener {
 
 sub proc_manager {
     shift->{_proc_manager};
+}
+
+sub register_process {
+    my ($self, $process) = @_;
+    $self->{_proc_manager}->run_process($process);
+    $self->{_select}->add($process->fh);
+    $self->{_procs}->{$process->fh} = $process;
+}
+
+sub deregister_process {
+    my ($self, $process, $exit_status) = @_;
+    $self->{_select}->remove($process->fh);
+    delete $self->{_procs}->{$process->fh};
+
+    # Broadcast a finished message.
+    my $message = Emux::Message->new(TYPE_FINISHED);
+    $message->body({
+        id        => $process->id,
+        exit_code => $exit_status || 0,
+    });
+    $self->broadcast_message($message);
+}
+
+sub is_proc_fh {
+    my ($self, $fh) = @_;
+    return defined $self->{_procs}->{$fh};
+}
+
+sub broadcast_message {
+    my ($self, $message) = @_;
+
+    # Broadcast to all connected clients.
+    print $message->encode, "\n";
 }
 
 sub daemonize {

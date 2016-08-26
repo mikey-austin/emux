@@ -24,10 +24,6 @@ sub server {
     return $self->{_server};
 }
 
-sub proc_manager {
-    shift->{_server}->proc_manager;
-}
-
 sub execute {
     ...
 }

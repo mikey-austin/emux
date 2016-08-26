@@ -3,6 +3,7 @@ package Emux::Message;
 use strict;
 use warnings;
 
+use parent qw(Exporter);
 use JSON;
 
 use constant {
@@ -10,6 +11,20 @@ use constant {
     TYPE_OUTPUT   => 'output',
     TYPE_FINISHED => 'finished',
 };
+
+our @constants = qw(
+    TYPE_EXECUTE
+    TYPE_OUTPUT
+    TYPE_FINISHED
+);
+
+our @EXPORT_OK = (
+    @constants
+);
+
+our %EXPORT_TAGS = (
+    constants => \@constants
+);
 
 sub new {
     my ($class, $type, $factory) = @_;
@@ -24,7 +39,8 @@ sub new {
     };
     bless $self, $class;
 
-    $self->{_command}->message($self);
+    $self->{_command}->message($self)
+        if defined $self->{_command};
 
     # Set some getter/setters directly in symbol table.
     foreach my $var (qw/type command body/) {
@@ -72,9 +88,10 @@ sub parse {
 
 sub TO_JSON {
     my $self = shift;
-
-    # The command knows it's own output format.
-    return $self->command->output;
+    return {
+        type => $self->{_type},
+        %{$self->{_body}}
+    };
 }
 
 1;

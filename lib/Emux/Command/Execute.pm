@@ -24,18 +24,13 @@ sub execute {
             exec "/usr/bin/ssh -qt $self->{_host} '$self->{_command}'";
         },
         on_exit => sub {
-            my $exit_status = shift;
-            # Submit finished message to server.
-            $self->server->{_logger}->debug(
-                'process %s exited with %s',
-                $self->{_id},
-                $exit_status,
-            );
+            my ($process, $exit_status) = @_;
+            $self->server->deregister_process(
+                $process, $exit_status);
         }
     );
-    $self->proc_manager->run_process($process);
 
-    # register output in server's select loop.
+    $self->server->register_process($process);
 }
 
 1;
