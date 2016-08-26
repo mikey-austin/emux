@@ -21,7 +21,7 @@ sub execute {
         id     => $self->{_id},
         host   => $self->{_host},
         on_run => sub {
-            exec "/usr/bin/ssh -qt $self->{_host} '$self->{_command} && sleep 5'";
+            exec "/usr/bin/ssh -qt $self->{_host} '$self->{_command}'";
         },
         on_exit => sub {
             my ($process, $exit_status) = @_;

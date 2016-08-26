@@ -74,16 +74,15 @@ sub start {
                 elsif ($self->is_proc_fh($handle)) {
                     # Read output and broadcast output message in chunks.
                     my ($line, $output);
+                    my $process = $self->{_procs}->{fileno($handle)};
                     my $select = IO::Select->new($handle);
                     do {
-                        local $/;
                         $line = readline($handle);
                         $output .= $line
                             if $line;
                     } while($line and $select->can_read(1));
                     next if not $output;
 
-                    my $process = $self->{_procs}->{"$handle"};
                     my $message = Emux::Message->new(TYPE_OUTPUT);
                     $message->body({
                         id      => $process->id,
@@ -171,13 +170,13 @@ sub register_process {
     my ($self, $process) = @_;
     $self->{_proc_manager}->run_process($process);
     $self->{_select}->add($process->fh);
-    $self->{_procs}->{"@{[$process->fh]}"} = $process;
+    $self->{_procs}->{fileno($process->fh)} = $process;
 }
 
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
-    delete $self->{_procs}->{"@{[$process->fh]}"};
+    delete $self->{_procs}->{fileno($process->fh)};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -190,7 +189,7 @@ sub deregister_process {
 
 sub is_proc_fh {
     my ($self, $fh) = @_;
-    return defined $self->{_procs}->{$fh};
+    return defined $self->{_procs}->{fileno($fh)};
 }
 
 sub broadcast_message {

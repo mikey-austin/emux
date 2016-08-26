@@ -196,8 +196,8 @@ sub _register_signals {
             if ($self->{_procs}->{pid}->{$pid}) {
                 my $process = $self->{_procs}->{pid}->{$pid};
                 eval {
-                    $self->_deregister_process($process);
                     $process->on_exit($exit_status);
+                    $self->_deregister_process($process);
                     1;
                 } or do {
                     my $error = $@;
