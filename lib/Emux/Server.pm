@@ -96,7 +96,8 @@ sub start {
                     my ($message, $error);
                     eval {
                         $message = Emux::Message->from_handle($handle, $self->{_cmd_factory});
-                        $message->command->execute;
+                        $message->command->execute
+                            if $message and $message->command;
                         1;
                     } or do {
                         $error = $@;
@@ -109,7 +110,8 @@ sub start {
                         $self->{_logger}->err('could not understand message');
                     }
 
-                    $self->{_select}->remove($handle);
+                    # Keep connection open for the moment...
+                    #$self->{_select}->remove($handle);
                     #$handle->close;
                 }
             }
