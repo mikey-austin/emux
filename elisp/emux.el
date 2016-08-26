@@ -2,7 +2,8 @@
 
 (require 'json)
 
-(defvar emux--process nil)
+(defvar emux--process-name "emux")
+(defvar emux-path "emux")
 
 (cl-defstruct emux--closure
   vars
@@ -182,16 +183,17 @@
       (error (emux--result-error err)))))
 
 (defun emux--process-filter (process output)
-  (emux--result-do (alist (emux--json-decode output))
-    (let ((handler (gethash (cdr (assoc "type" alist)) emux--response-type-table)))
-      (if handler
-          (emux--result-match (val (emux--funcall handler alist))
-            (:ok t)
-            (:error (error val)))
-        (error "unknown type")))))
+  (emux--result-match (alist-val (emux--json-decode output))
+    (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
+           (if handler
+               (emux--result-match (val (emux--funcall handler alist-val))
+                 (:ok t)
+                 (:error (warn val)))
+             (warn "unknown type"))))
+    (:error (warn alist-val))))
 
 (defun emux--send-message (args)
-  (process-send-string emux--process (concat (json-encode (remove-if-not 'cdr args)) "\n")))
+  (process-send-string emux--process-name (concat (json-encode (remove-if-not 'cdr args)) "\n")))
 
 (defun emux--prefix-symbol (prefix-str symb)
   (intern (concat prefix-str
@@ -238,6 +240,9 @@
 (emux--defspec string () data
   (stringp data))
 
+(emux--defspec integer () data
+  (integerp data))
+
 (emux--defspec vector (a) data
   (and (vectorp data)
        (every a data)))
@@ -250,19 +255,22 @@
   (print id)
   (print content))
 
+(emux--defresponse-type finished ((id string) (exit_code integer)))
+
 (emux--defmessage-type execute ((id string)
                                 (command string)
                                 (machine (option string))
                                 (tags (option (vector string)))))
 
-(defun emux-start-client (path)
-  (setf emux--process (make-network-process :name "emux"
-                                            :bufer (get-buffer-create "*emux*")
-                                            :filter 'emux--process-filter
-                                            :remote path)))
+(defun emux-start-client ()
+  (when (emux-running?)
+    (emux-finish-client))
+  (when (start-process emux--process-name "*emux*" emux-path)
+    (set-process-filter (get-process emux--process-name)
+                        #'emux--process-filter)))
 
 (defun emux-finish-client ()
-  (delete-process emux--process))
+  (delete-process emux--process-name))
 
 (defun emux-running? ()
-  (process-live-p emux--process))
+  (process-live-p emux--process-name))
