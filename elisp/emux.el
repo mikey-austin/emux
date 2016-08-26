@@ -257,12 +257,17 @@
                                 (machine (option string))
                                 (tags (option (vector string)))))
 
-(defun emux-start-client ()
+(defun emux-start-client (&optional path)
   (when (emux-running?)
     (emux-finish-client))
-  (when (start-process emux--process-name "*emux*" emux-path)
-    (set-process-filter (get-process emux--process-name)
-                        #'emux--process-filter)))
+  (if path
+      (make-network-process :name emux--process-name
+                            :buffer "*emux*"
+                            :filter #'emux--process-filter
+                            :remote path)
+    (when (start-process emux--process-name "*emux*" emux-path)
+      (set-process-filter (get-process emux--process-name)
+                          #'emux--process-filter))))
 
 (defun emux-finish-client ()
   (delete-process emux--process-name))
