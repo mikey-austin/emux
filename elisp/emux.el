@@ -250,7 +250,7 @@
       (emux--funcall a data)))
 
 (emux--defresponse-type output ((id string) (content string))
-  (emux--write-to-emux-buffer id content))
+  (emux--write-to-emux-buffer id (base64-decode-string content)))
 
 (emux--defresponse-type finished ((id string) (exit_code integer)))
 
@@ -272,9 +272,10 @@
           (if moving (goto-char (process-mark proc))))))))
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
-  (if (null id)
-      (emux--add-log content)
-    (emux--write-to-emux-buffer (concat id " (stderr)") content)))
+  (let ((content (base64-decode-string content)))
+    (if (null id)
+        (emux--add-log content)
+      (emux--write-to-emux-buffer (concat id " (stderr)") content))))
 
 (emux--defmessage-type state ())
 
