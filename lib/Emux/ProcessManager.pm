@@ -32,13 +32,14 @@ sub run_process {
         if defined $self->{_procs}->{$process->id};
 
     $self->_check_master($process);
-    my ($pid, $fh) = $self->_fork(
+    my ($pid, $fh, $errors) = $self->_fork(
         routine => sub {
-            my $fh = shift;
+            my ($fh, $errors) = @_;
             # Setup stdout & stdin to be over the supplied filehandle.
             if (defined $fh) {
                 dup2(fileno($fh), STDIN_FILENO);
                 dup2(fileno($fh), STDOUT_FILENO);
+                dup2(fileno($errors), STDERR_FILENO);
             }
             $self->{_logger}->debug('running process id %s', $process->id);
             $process->run;
@@ -46,6 +47,7 @@ sub run_process {
     );
     $process->pid($pid);
     $process->fh($fh);
+    $process->errors($errors);
     $self->_register_process($process);
 }
 
@@ -152,24 +154,29 @@ sub _fork {
     die 'routine required'
         if not exists $args{routine};
 
-    my ($child_handle, $parent_handle);
+    my ($child_handle, $parent_handle, $child_errors, $parent_errors);
     my $setup_fh = wantarray ? 1 : 0;
     if ($setup_fh) {
         # Setup pipes to forked process if called in array context.
         socketpair($child_handle, $parent_handle, AF_UNIX, SOCK_STREAM, PF_UNSPEC)
             or die "socketpair failed: $!";
+        socketpair($child_errors, $parent_errors, AF_UNIX, SOCK_STREAM, PF_UNSPEC)
+            or die "socketpair failed: $!";
         $child_handle->autoflush(1);
         $parent_handle->autoflush(1);
+        $child_errors->autoflush(1);
+        $parent_errors->autoflush(1);
     }
 
     my $pid;
     if(($pid = fork()) == 0) {
         # In child.
         if ($setup_fh) {
-            close($parent_handle)
+            close($parent_handle);
+            close($parent_errors);
         }
         $SIG{'CHLD'} = 'IGNORE';
-        $args{routine}->($child_handle);
+        $args{routine}->($child_handle, $child_errors);
         exit(0);
     }
     elsif(not defined $pid) {
@@ -177,11 +184,13 @@ sub _fork {
     }
     else {
         # In parent.
-        close($child_handle)
-            if $setup_fh;
+        if ($setup_fh) {
+            close($child_handle);
+            close($child_errors);
+        }
     }
 
-    return $setup_fh ? ($pid, $parent_handle) : $pid;
+    return $setup_fh ? ($pid, $parent_handle, $parent_errors) : $pid;
 }
 
 sub _register_signals {

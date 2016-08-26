@@ -12,11 +12,12 @@ sub new {
         _on_exit => $args{on_exit},
         _pid     => undef,
         _fh      => undef, # The parent filehandle
+        _errors  => undef, # The stderr filehandle
     };
     bless $self, $class;
 
     # Set some getters/setters.
-    foreach my $var (qw/id host fh pid/) {
+    foreach my $var (qw/id host fh pid errors/) {
         no strict 'refs';
         *{"$class::$var"} = sub {
             my ($self, $arg) = @_;

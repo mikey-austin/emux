@@ -17,13 +17,14 @@ use POSIX ();
 sub new {
     my ($class, $config, $logger) = @_;
     my $self = {
-        _pid       => undef,
-        _config    => $config,
-        _logger    => $logger,
-        _listeners => [],
-        _procs     => {},
-        _clients   => [ *STDOUT ],
-        _select    => IO::Select->new,
+        _pid         => undef,
+        _config      => $config,
+        _logger      => $logger,
+        _listeners   => [],
+        _procs       => {},
+        _proc_errors => {},
+        _clients     => [ *STDOUT ],
+        _select      => IO::Select->new,
     };
     bless $self, $class;
 
@@ -85,24 +86,14 @@ sub start {
                     push @{$self->{_clients}}, $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
-                    # Read output and broadcast output message in chunks.
-                    my ($line, $output);
                     my $process = $self->{_procs}->{fileno($handle)};
-                    my $select = IO::Select->new($handle);
-                    do {
-                        $line = readline($handle);
-                        $output .= $line
-                            if $line;
-                    } while($line and $select->can_read(1));
-                    next if not $output;
-
-                    my $message = Emux::Message->new(TYPE_OUTPUT);
-                    $message->body({
-                        id      => $process->id,
-                        #content => base64_encode($output),
-                        content => $output,
-                    });
-                    $self->broadcast_message($message);
+                    $self->handle_proc_output(
+                        TYPE_OUTPUT, $process, $handle);
+                }
+                elsif ($self->is_proc_error_fh($handle)) {
+                    my $process = $self->{_proc_errors}->{fileno($handle)};
+                    $self->handle_proc_output(
+                        TYPE_ERROR_OUTPUT, $process, $handle);
                 }
                 else {
                     my ($message, $error);
@@ -184,12 +175,14 @@ sub register_process {
     $self->{_proc_manager}->run_process($process);
     $self->{_select}->add($process->fh);
     $self->{_procs}->{fileno($process->fh)} = $process;
+    $self->{_proc_errors}->{fileno($process->errors)} = $process;
 }
 
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
     delete $self->{_procs}->{fileno($process->fh)};
+    delete $self->{_proc_errors}->{fileno($process->fh)};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -203,6 +196,33 @@ sub deregister_process {
 sub is_proc_fh {
     my ($self, $fh) = @_;
     return defined $self->{_procs}->{fileno($fh)};
+}
+
+sub is_proc_error_fh {
+    my ($self, $fh) = @_;
+    return defined $self->{_proc_errors}->{fileno($fh)};
+}
+
+sub handle_proc_output {
+    my ($self, $type, $process, $handle) = @_;
+
+    # Read output and broadcast output message in chunks.
+    my ($line, $output);
+    my $select = IO::Select->new($handle);
+    do {
+        $line = readline($handle);
+        $output .= $line
+        if $line;
+    } while ($line and $select->can_read(1));
+    next if not $output;
+
+    my $message = Emux::Message->new($type);
+    $message->body({
+        id      => $process->id,
+        #content => base64_encode($output),
+        content => $output,
+    });
+    $self->broadcast_message($message);
 }
 
 sub broadcast_message {
