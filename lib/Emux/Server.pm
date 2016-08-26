@@ -72,12 +72,14 @@ sub start {
                 elsif ($self->is_proc_fh($handle)) {
                     # Read output and broadcast output message in chunks.
                     my ($line, $output);
+                    $self->{_select}->remove($handle);
                     my $select = IO::Select->new($handle);
                     do {
                         $line = readline($handle);
                         $output .= $line
                             if $line;
                     } while($select->can_read(1));
+                    $select = undef;
                     next if not $output;
 
                     my $process = $self->{_procs}->{$handle};
@@ -88,6 +90,7 @@ sub start {
                         content => $output,
                     });
                     $self->broadcast_message($message);
+                    $self->{_select}->add($handle);
                 }
                 else {
                     my ($message, $error);
