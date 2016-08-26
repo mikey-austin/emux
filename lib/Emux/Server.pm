@@ -61,8 +61,7 @@ sub start {
             my $log_message = shift;
             my $message = Emux::Message->new(TYPE_ERROR_OUTPUT);
             $message->body({
-                #content => base64_encode($log_message),
-                content => $log_message,
+                content => base64_encode($log_message),
             });
             $self->broadcast_message($message);
         }
@@ -188,7 +187,7 @@ sub deregister_process {
     my $message = Emux::Message->new(TYPE_FINISHED);
     $message->body({
         id        => $process->id,
-        exit_code => $exit_status || 0,
+        exit_code => int($exit_status) || 0,
     });
     $self->broadcast_message($message);
 }
@@ -219,8 +218,7 @@ sub handle_proc_output {
     my $message = Emux::Message->new($type);
     $message->body({
         id      => $process->id,
-        #content => base64_encode($output),
-        content => $output,
+        content => base64_encode($output),
     });
     $self->broadcast_message($message);
 }
