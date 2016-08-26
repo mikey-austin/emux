@@ -61,7 +61,7 @@ sub start {
             my $log_message = shift;
             my $message = Emux::Message->new(TYPE_ERROR_OUTPUT);
             $message->body({
-                content => base64_encode($log_message),
+                content => encode_base64($log_message),
             });
             $self->broadcast_message($message);
         }
@@ -218,7 +218,7 @@ sub handle_proc_output {
     my $message = Emux::Message->new($type);
     $message->body({
         id      => $process->id,
-        content => base64_encode($output),
+        content => encode_base64($output),
     });
     $self->broadcast_message($message);
 }
