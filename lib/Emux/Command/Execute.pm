@@ -17,12 +17,17 @@ sub execute {
     $self->{_host} = $message->{_body}->{machine} || 'localhost';
     $self->{_tags} = $message->{_body}->{tags} || [];
 
+    my $cmd;
+    if ($self->{_host} eq 'localhost') {
+        $cmd = $self->{_command};
+    } else {
+        $cmd = "/usr/bin/ssh -qt $self->{_host} '$self->{_command}'";
+    }
+
     my $process = Emux::Process->new(
         id     => $self->{_id},
         host   => $self->{_host},
-        on_run => sub {
-            exec "/usr/bin/ssh -qt $self->{_host} '$self->{_command}'";
-        },
+        on_run => sub { exec $cmd; },
         on_exit => sub {
             my ($process, $exit_status) = @_;
             $self->server->deregister_process(
