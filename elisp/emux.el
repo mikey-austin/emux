@@ -179,18 +179,14 @@
       (error (emux--result-error err)))))
 
 (defun emux--process-filter (process output)
-  (let ((lines (split-string output "\n")))
-    (cl-loop for l in lines
-             do (if (string-prefix-p "{" l)
-                    (emux--result-match (alist-val (emux--json-decode l))
-                      (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
-                             (if handler
-                                 (emux--result-match (val (emux--funcall handler alist-val))
-                                   (:ok t)
-                                   (:error (warn val)))
-                               (warn "unknown type"))))
-                      (:error (warn alist-val)))
-                  (emux--add-log l)))))
+   (emux--result-match (alist-val (emux--json-decode output))
+     (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
+            (if handler
+                (emux--result-match (val (emux--funcall handler alist-val))
+                  (:ok t)
+                  (:error (warn val)))
+              (warn "unknown type"))))
+    (:error (warn alist-val))))
 
 (defun emux--add-log (line)
   (with-current-buffer (get-buffer-create emux-log-buffer-name)
@@ -250,6 +246,16 @@
       (emux--funcall a data)))
 
 (emux--defresponse-type output ((id string) (content string))
+  (emux--write-to-emux-buffer content))
+
+(emux--defresponse-type finished ((id string) (exit_code integer)))
+
+(emux--defmessage-type execute ((id string)
+                                (command string)
+                                (machine (option string))
+                                (tags (option (vector string)))))
+
+(defun emux--write-to-emux-buffer (content)
   (let ((proc (get-process emux--process-name)))
     (when (buffer-live-p (process-buffer proc))
       (with-current-buffer (process-buffer proc)
@@ -260,12 +266,10 @@
             (set-marker (process-mark proc) (point)))
           (if moving (goto-char (process-mark proc))))))))
 
-(emux--defresponse-type finished ((id string) (exit_code integer)))
-
-(emux--defmessage-type execute ((id string)
-                                (command string)
-                                (machine (option string))
-                                (tags (option (vector string)))))
+(emux--defresponse-type error_output ((id (option string)) (content string))
+  (if (null id)
+      (emux--add-log content)
+    (emux--write-to-emux-buffer content)))
 
 (emux--defmessage-type state ())
 
