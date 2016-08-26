@@ -1,4 +1,8 @@
+;; -*- lexical-binding: t -*-
+
 (require 'json)
+
+(defvar emux--process nil)
 
 (cl-defstruct emux--closure
   vars
@@ -186,6 +190,34 @@
             (:error (error val)))
         (error "unknown type")))))
 
+(defun emux--send-message (&rest args)
+  (process-send-string emux--process (json-encode args)))
+
+(defun emux--prefix-symbol (prefix-str symb)
+  (intern (concat prefix-str
+                  (symbol-name symb))))
+
+(defmacro emux--defmessage-type (name args &rest body)
+  (let ((arg-names (mapcar 'car args))
+        (spec-sexps (mapcar 'cadr args))
+        (specs (cl-gensym))
+        (specs-val (cl-gensym))
+        (val (cl-gensym)))
+    `(let ((,specs (emux--result-seq (mapcar (lambda (as)
+                                                       (emux--getspec-pred as))
+                                                     ',spec-sexps))))
+       (emux--result-match (,specs-val ,specs)
+         (:ok (cl-defun ,(emux--prefix-symbol "emux-"  name) ,(cons '&key arg-names)
+                (emux--result-match (,val (emux--result-seq (mapcar (lambda (p x)
+                                                                      (emux--funcall p x))
+                                                                    (list ,@arg-names)
+                                                                    ,specs-val)))
+                  (:ok (emux--send-message ,@arg-names)
+                       ,@body)
+                  (:error (error ,val)))))
+         (:error (error ,specs-val))))))
+(put 'emux--defmessage-type 'lisp-indent-function 2)
+
 (emux--defspec string () data
   (stringp data))
 
@@ -197,13 +229,14 @@
   (or (not data)
       (emux--funcall a data)))
 
-(emux--defresponse-type output ((id string) (tags (option (vector string))) (content string))
+(emux--defresponse-type output ((id string) (content string))
   (print id)
-  (print tags)
   (print content))
 
-
-(defvar emux--process nil)
+(emux--defmessage-type execute ((id string)
+                                (command string)
+                                (machine (option string))
+                                (tags (option (vector string)))))
 
 (defun emux-start-client (path)
   (setf emux--process (make-network-process :name "emux"
@@ -216,12 +249,3 @@
 
 (defun emux-running? ()
   (process-live-p emux--process))
-
-(defun emux--encode (&rest args)
-  (json-encode args))
-
-(defun emux-command (machine command id tags)
-  (process-send-string emux--process (emux--encode :type "execute"
-                                                   :id id
-                                                   :machine machine
-                                                   :tags tags)))
