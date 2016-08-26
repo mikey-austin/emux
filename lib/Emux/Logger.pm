@@ -7,10 +7,11 @@ use POSIX qw(strftime);
 use Sys::Syslog qw(:standard :macros);
 
 sub new {
-    my ($class, $config) = @_;
+    my ($class, $config, %args) = @_;
     my $self = {
-        _config => $config,
-        _syslog => 0,
+        _config     => $config,
+        _syslog     => 0,
+        _on_message => $args{on_message} || sub {},
     };
     bless $self, $class;
 
@@ -33,6 +34,11 @@ sub new {
     return $self;
 }
 
+sub on_message {
+    my ($self, $callback) = @_;
+    $self->{_on_message} = $callback;
+}
+
 sub log_message {
     my ($self, $message, $priority) = @_;
     $priority ||= 'warning';
@@ -46,6 +52,9 @@ sub log_message {
         my $timestamp = strftime "%F %T", localtime;
         print STDERR "[$timestamp $$]: $message\n";
     }
+
+    $self->{_on_message}->($message)
+        if $self->{_on_message};
 
     return $message;
 }

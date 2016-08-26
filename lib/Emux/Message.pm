@@ -7,14 +7,16 @@ use parent qw(Exporter);
 use JSON;
 
 use constant {
-    TYPE_EXECUTE  => 'execute',
-    TYPE_OUTPUT   => 'output',
-    TYPE_FINISHED => 'finished',
+    TYPE_EXECUTE      => 'execute',
+    TYPE_OUTPUT       => 'output',
+    TYPE_ERROR_OUTPUT => 'error_output',
+    TYPE_FINISHED     => 'finished',
 };
 
 our @constants = qw(
     TYPE_EXECUTE
     TYPE_OUTPUT
+    TYPE_ERROR_OUTPUT
     TYPE_FINISHED
 );
 

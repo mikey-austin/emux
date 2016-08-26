@@ -54,6 +54,19 @@ sub start {
     $self->register_signals;
     $self->register_listeners;
 
+    # Set a callback to send logging messages in packets.
+    $self->{_logger}->on_message(
+        sub {
+            my $log_message = shift;
+            my $message = Emux::Message->new(TYPE_ERROR_OUTPUT);
+            $message->body({
+                #content => base64_encode($log_message),
+                content => $log_message,
+            });
+            $self->broadcast_message($message);
+        }
+    );
+
     for (;;) {
         while (my @ready = $self->{_select}->can_read) {
             foreach my $handle (@ready) {
