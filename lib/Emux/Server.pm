@@ -182,7 +182,7 @@ sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
     delete $self->{_procs}->{fileno($process->fh)};
-    delete $self->{_proc_errors}->{fileno($process->fh)};
+    delete $self->{_proc_errors}->{fileno($process->errors)};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -214,7 +214,7 @@ sub handle_proc_output {
         $output .= $line
         if $line;
     } while ($line and $select->can_read(1));
-    next if not $output;
+    return if not $output;
 
     my $message = Emux::Message->new($type);
     $message->body({
