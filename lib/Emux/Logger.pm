@@ -11,6 +11,7 @@ sub new {
     my $self = {
         _config     => $config,
         _syslog     => 0,
+        _stderr     => 0,
         _on_message => $args{on_message} || sub {},
     };
     bless $self, $class;
@@ -48,7 +49,7 @@ sub log_message {
         syslog($priority, '%s', $message);
         closelog();
     }
-    else {
+    elsif ($self->{_stderr}) {
         my $timestamp = strftime "%F %T", localtime;
         print STDERR "[$timestamp $$]: $message\n";
     }

@@ -23,7 +23,7 @@ sub new {
         _listeners   => [],
         _procs       => {},
         _proc_errors => {},
-        _clients     => [ *STDOUT ],
+        _clients     => [],
         _select      => IO::Select->new,
     };
     bless $self, $class;
