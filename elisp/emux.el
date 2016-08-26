@@ -240,8 +240,15 @@
       (emux--funcall a data)))
 
 (emux--defresponse-type output ((id string) (content string))
-  (print id)
-  (print content))
+  (let ((proc (get-process emux--process-name)))
+    (when (buffer-live-p (process-buffer proc))
+      (with-current-buffer (process-buffer proc)
+        (let ((moving (= (point) (process-mark proc))))
+          (save-excursion
+            (goto-char (process-mark proc))
+            (insert content)
+            (set-marker (process-mark proc) (point)))
+          (if moving (goto-char (process-mark proc))))))))
 
 (emux--defresponse-type finished ((id string) (exit_code integer)))
 
