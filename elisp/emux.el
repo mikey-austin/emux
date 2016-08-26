@@ -61,11 +61,6 @@
          (:ok ,@body)))))
 (put 'emux--result-do 'lisp-indent-function 1)
 
-(defun emux--result-bind (val f)
-  "With the value inside VAL as argument, call F if VAL is the :ok variant.  Return VAL if it's the :error variant."
-  (emux--result-do (x val)
-    (emux--funcall f x)))
-
 (defun emux--result-apply (val &rest args)
   "Apply the function inside VAL to ARGS if VAL is the :ok variant.  Return VAL if not."
   (emux--result-do (f val)
@@ -193,19 +188,12 @@
     (:error (warn alist-val))))
 
 (defun emux--send-message (args)
-  (process-send-string emux--process-name (concat (json-encode (remove-if-not 'cdr args)) "\n")))
+  (process-send-string emux--process-name
+                       (concat (json-encode (remove-if-not 'cdr args)) "\n")))
 
 (defun emux--prefix-symbol (prefix-str symb)
   (intern (concat prefix-str
                   (symbol-name symb))))
-
-(defun emux--intersperse-&key (symbol-list)
-  (reduce (lambda (acc s)
-            (cons '&key (cons s acc)))
-          symbol-list :initial-value ()))
-
-(defun emux--symbol-to-keyword (s)
-  (emux--prefix-symbol ":" s))
 
 (defun emux--message-alist (type-var symbol-list)
   (cons 'list (cons `(cons "type" ,type-var)
