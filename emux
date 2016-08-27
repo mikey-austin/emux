@@ -15,16 +15,17 @@ my $version = 0;
 my $config_file = '';
 
 GetOptions(
-    "daemonize|daemon|daemonise" => \$options->{daemonize},
-    "socket=s"                   => \$options->{socket},
-    "pidfile=s"                  => \$options->{pidfile},
-    "user=s"                     => \$options->{user},
-    "group=s"                    => \$options->{group},
-    "host=s"                     => \$options->{host},
-    "port=s"                     => \$options->{port},
-    "config=s"                   => \$config_file,
-    "help"                       => \$help,
-    "version"                    => \$version)
+    "daemon"    => \$options->{daemonize},
+    "socket=s"  => \$options->{socket},
+    "pidfile=s" => \$options->{pidfile},
+    "user=s"    => \$options->{user},
+    "group=s"   => \$options->{group},
+    "host=s"    => \$options->{host},
+    "port=s"    => \$options->{port},
+    "logger=s"  => \$options->{logger},
+    "config=s"  => \$config_file,
+    "help"      => \$help,
+    "version"   => \$version)
     or pod2usage(1) and die("Error in command line arguments\n");
 
 my $config = Emux::Config->new($config_file)->merge($options);

@@ -16,10 +16,11 @@ sub new {
     };
     bless $self, $class;
 
-    if (defined $self->{_config}->get('logger')
-        and $self->{_config}->get('logger') eq 'syslog')
-    {
-        $self->{_syslog} = 1;
+    if (defined $self->{_config}->get('logger')) {
+        $self->{_syslog} = 1
+            if $self->{_config}->get('logger') eq 'syslog';
+        $self->{_stderr} = 1
+            if $self->{_config}->get('logger') eq 'stderr';
     }
 
     foreach my $level (qw/err warn info debug/) {

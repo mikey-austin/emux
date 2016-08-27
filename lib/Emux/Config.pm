@@ -8,12 +8,11 @@ use constant {
     DEFAULTS => {
         daemonize => 0,
         pidfile   => '/tmp/emux.pid',
-        logger    => 'stdout',
+        logger    => undef,
         socket    => undef,
         user      => undef,
         group     => undef,
         host      => undef,
-        port      => 9999
     }
 };
 
