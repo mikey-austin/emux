@@ -163,10 +163,8 @@ sub register_listeners {
         $listeners++;
     }
 
-    my ($host, $port);
-    if (($host, $port) = $self->{_config}->get('host', 'port')
-        and defined $host and defined $port)
-    {
+    my ($host, $port) = $self->{_config}->get('host', 'port');
+    if ($host and $port) {
         my $fh = IO::Socket::INET->new(
             LocalAddr => $host,
             LocalPort => $port,

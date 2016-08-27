@@ -8,11 +8,12 @@ use constant {
     DEFAULTS => {
         daemonize        => 0,
         pidfile          => '/tmp/emux.pid',
-        logger           => undef,
+        logger           => '',
         socket           => $ENV{EMUX_SOCKET} || '/tmp/emux.sock',
-        user             => undef,
-        group            => undef,
-        host             => undef,
+        user             => '',
+        group            => '',
+        host             => '',
+        port             => '',
         listen_stdin     => 0,
         broadcast_stdout => 0,
     }
@@ -44,10 +45,12 @@ sub new {
 sub merge {
     my ($self, $sub_config, $base_config) = @_;
 
+    my %defaults = %{+DEFAULTS};
     $base_config ||= $self->{_config};
     foreach my $key (keys %{$sub_config}) {
         # Overwrite all other keys.
         $base_config->{$key} = $sub_config->{$key}
+            if "$sub_config->{$key}" ne "$defaults{$key}";
     }
 
     return $self;

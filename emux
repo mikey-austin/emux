@@ -12,7 +12,7 @@ use Pod::Usage;
 my $options = Emux::Config::DEFAULTS;
 my $help = 0;
 my $version = 0;
-my $config_file = '';
+my $config_file = $ENV{EMUX_CONFIG} || '';
 
 GetOptions(
     "daemon"    => \$options->{daemonize},
