@@ -63,14 +63,6 @@
          (:ok ,@body)))))
 (put 'emux--result-do 'lisp-indent-function 1)
 
-(defun emux--result-apply (val &rest args)
-  "Apply the function inside VAL to ARGS if VAL is the :ok variant.  Return VAL if not."
-  (emux--result-do (f val)
-    (emux--apply f args)))
-
-(defun emux--result-is-error (val)
-  (eq (emux--result-variant val) :error))
-
 (defun emux--result-seq (list)
   (block func-body
     (let ((unwrapped ()))
@@ -78,7 +70,16 @@
        (emux--result-match (val res)
          (:ok (push val unwrapped))
          (:error (return-from func-body res))))
-     (emux--result-ok (reverse unwrapped)))))
+     (emux--result-ok (nreverse unwrapped)))))
+
+(defun emux--result-seq-map (f xs)
+  (block func-body
+   (let ((result ()))
+     (dolist (x xs (emux--result-ok (nreverse result)))
+       (let ((f-x (emux--funcall f x)))
+         (emux--result-match (val f-x)
+           (:ok (push val result))
+           (:error (return-from func-body f-x))))))))
 
 (defun emux--puthash (key value table)
   "Insert the KEY VALUE pair into TABLE with the VALUE wrapped into an emux--result."
@@ -97,9 +98,6 @@
 (cl-defstruct emux--spec
   arity
   func)
-
-(defun emux--spec-concrete-p (s)
-  (= (emux--spec-arity s) 0))
 
 (defun emux--spec-wrap-predicate (spec-s pred x)
   (let ((success (emux--funcall pred x)))
@@ -136,7 +134,7 @@
                (emux--result-error (format "Spec %S has arity %i and can't be used with %S as arguments"
                                            name arity arg-list)))
               ((= arity 0) (emux--result-ok func))
-              (t (emux--result-do (args (emux--result-seq (mapcar 'emux--getspec-func arg-list)))
+              (t (emux--result-do (args (emux--result-seq-map 'emux--getspec-func arg-list))
                    (emux--result-ok (emux--partial-apply func args)))))))))
 
 (defun emux--getspec-pred (spec-s)
@@ -146,9 +144,10 @@
 (defvar emux--response-type-table (make-hash-table :test 'equal))
 
 (defun emux--validate-apply (args-and-specs func obj)
-  (emux--result-do (values (emux--result-seq (mapcar (lambda (x)
-                                                       (emux--funcall (cdr x) (cdr (assoc (car x) obj))))
-                                                     args-and-specs)))
+  (emux--result-do (values (emux--result-seq-map (lambda (x)
+                                                   (emux--funcall (cdr x)
+                                                                  (cdr (assoc (car x) obj))))
+                                                 args-and-specs))
     (emux--result-ok (emux--apply func values))))
 
 (defun emux--extract-arg-name-and-spec (x)
@@ -158,7 +157,7 @@
       (emux--result-ok (cons name spec)))))
 
 (defun emux--make-args-and-specs (arg-list)
-  (emux--result-seq (mapcar 'emux--extract-arg-name-and-spec arg-list)))
+  (emux--result-seq-map 'emux--extract-arg-name-and-spec arg-list))
 
 (defmacro emux--defresponse-type (name args &rest body)
   (let* ((args-and-specs (cl-gensym))
@@ -199,7 +198,8 @@
 
 (defun emux--send-message (args)
   (process-send-string emux--process-name
-                       (concat (json-encode (remove-if-not 'cdr args)) "\n")))
+                       (concat (json-encode (remove-if-not 'cdr args))
+                               "\n")))
 
 (defun emux--prefix-symbol (prefix-str symb)
   (intern (concat prefix-str
@@ -219,9 +219,9 @@
         (specs-val (cl-gensym))
         (val (cl-gensym))
         (type-as-string (symbol-name name)))
-    `(let ((,specs (emux--result-seq (mapcar (lambda (as)
-                                               (emux--getspec-pred as))
-                                             ',spec-sexps))))
+    `(let ((,specs (emux--result-seq-map (lambda (as)
+                                           (emux--getspec-pred as))
+                                         ',spec-sexps)))
        (emux--result-match (,specs-val ,specs)
          (:ok (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
                 (emux--result-match (,val (emux--result-seq (mapcar* (lambda (p x)
