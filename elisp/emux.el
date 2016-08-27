@@ -291,8 +291,8 @@
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string)))))
 
-(defun emux-start-client (&optional path) ()
-  (interactive (list (read-string "Socket: " (getenv "EMUX_SOCKET") nil nil t))))
+(defun emux-start-client (&optional path)
+  (interactive (list (read-string "Socket: " (getenv "EMUX_SOCKET") nil nil t)))
   (when (emux-running?)
     (emux-finish-client))
   (if (and path
