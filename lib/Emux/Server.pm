@@ -85,12 +85,12 @@ sub start {
                     $self->{_clients}->{$client} = $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
-                    my $process = $self->{_procs}->{fileno($handle)};
+                    my $process = $self->{_procs}->{$handle};
                     $self->handle_proc_output(
                         TYPE_OUTPUT, $process, $handle);
                 }
                 elsif ($self->is_proc_error_fh($handle)) {
-                    my $process = $self->{_proc_errors}->{fileno($handle)};
+                    my $process = $self->{_proc_errors}->{$handle};
                     $self->handle_proc_output(
                         TYPE_ERROR_OUTPUT, $process, $handle);
                 }
@@ -125,11 +125,15 @@ sub start {
 
 sub disconnect {
     my ($self, $handle) = @_;
-    $self->{_logger}->info('client disconnected');
-    $self->{_select}->remove($handle);
-    $handle->close
-        if $handle->can('close');
-    delete $self->{_clients}->{$handle};
+
+    # Make sure it is a client.
+    if (defined $self->{_clients}->{$handle}) {
+        $self->{_logger}->info('client disconnected');
+        $self->{_select}->remove($handle);
+        $handle->close
+            if $handle->can('close');
+        delete $self->{_clients}->{$handle};
+    }
 }
 
 sub register_listeners {
@@ -171,7 +175,7 @@ sub register_listeners {
 
 sub is_listener {
     my ($self, $fh) = @_;
-    any { fileno($_) == fileno($fh) } @{$self->{_listeners}};
+    any { $_ == $fh } @{$self->{_listeners}};
 }
 
 sub proc_manager {
@@ -183,15 +187,15 @@ sub register_process {
     $self->{_proc_manager}->run_process($process);
     $self->{_select}->add($process->fh);
     $self->{_select}->add($process->errors);
-    $self->{_procs}->{fileno($process->fh)} = $process;
-    $self->{_proc_errors}->{fileno($process->errors)} = $process;
+    $self->{_procs}->{$process->fh} = $process;
+    $self->{_proc_errors}->{$process->errors} = $process;
 }
 
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
-    delete $self->{_procs}->{fileno($process->fh)};
-    delete $self->{_proc_errors}->{fileno($process->errors)};
+    delete $self->{_procs}->{$process->fh};
+    delete $self->{_proc_errors}->{$process->errors};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -204,12 +208,12 @@ sub deregister_process {
 
 sub is_proc_fh {
     my ($self, $fh) = @_;
-    return defined $self->{_procs}->{fileno($fh)};
+    return defined $self->{_procs}->{$fh};
 }
 
 sub is_proc_error_fh {
     my ($self, $fh) = @_;
-    return defined $self->{_proc_errors}->{fileno($fh)};
+    return defined $self->{_proc_errors}->{$fh};
 }
 
 sub handle_proc_output {
