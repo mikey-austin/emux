@@ -23,7 +23,10 @@ sub new {
         _listeners   => [],
         _procs       => {},
         _proc_errors => {},
-        _clients     => {},
+        _clients     => {
+            $config->get('broadcast_stdout')
+                ? ( "*STDOUT" => *STDOUT ) : ()
+        },
         _select      => IO::Select->new,
     };
     bless $self, $class;
@@ -139,9 +142,13 @@ sub disconnect {
 sub register_listeners {
     my $self = shift;
 
-    unless ($self->{_config}->get('daemonize')) {
+    my $listeners = 0;
+    if ($self->{_config}->get('listen_on_stdin')
+        and not $self->{_config}->get('daemonize'))
+    {
         $self->{_select}->add(*STDIN);
         $self->{_logger}->info("Listening on STDIN");
+        $listeners++;
     }
 
     if (my $socket = $self->{_config}->get('socket')) {
@@ -153,6 +160,7 @@ sub register_listeners {
         $self->{_select}->add($fh);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $socket");
+        $listeners++;
     }
 
     my ($host, $port);
@@ -170,7 +178,11 @@ sub register_listeners {
         $self->{_select}->add($fh);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $host:$port");
+        $listeners++;
     }
+
+    die 'no listeners defined'
+        if $listeners == 0;
 }
 
 sub is_listener {

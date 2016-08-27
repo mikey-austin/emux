@@ -23,6 +23,8 @@ GetOptions(
     "host=s"    => \$options->{host},
     "port=s"    => \$options->{port},
     "logger=s"  => \$options->{logger},
+    "stdin"     => \$options->{listen_stdin},
+    "stdout"    => \$options->{broadcast_stdout},
     "config=s"  => \$config_file,
     "help"      => \$help,
     "version"   => \$version)

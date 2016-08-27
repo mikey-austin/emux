@@ -6,13 +6,15 @@ use warnings;
 use JSON;
 use constant {
     DEFAULTS => {
-        daemonize => 0,
-        pidfile   => '/tmp/emux.pid',
-        logger    => undef,
-        socket    => undef,
-        user      => undef,
-        group     => undef,
-        host      => undef,
+        daemonize        => 0,
+        pidfile          => '/tmp/emux.pid',
+        logger           => undef,
+        socket           => undef,
+        user             => undef,
+        group            => undef,
+        host             => undef,
+        listen_stdin     => 0,
+        broadcast_stdout => 0,
     }
 };
 
