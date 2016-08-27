@@ -182,6 +182,7 @@ sub register_process {
     my ($self, $process) = @_;
     $self->{_proc_manager}->run_process($process);
     $self->{_select}->add($process->fh);
+    $self->{_select}->add($process->errors);
     $self->{_procs}->{fileno($process->fh)} = $process;
     $self->{_proc_errors}->{fileno($process->errors)} = $process;
 }

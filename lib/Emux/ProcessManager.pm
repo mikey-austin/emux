@@ -170,6 +170,9 @@ sub _fork {
 
     my $pid;
     if(($pid = fork()) == 0) {
+        $self->{_logger}->on_message(undef);
+        $self->{_logger}->prefix(0);
+
         # In child.
         if ($setup_fh) {
             close($parent_handle);

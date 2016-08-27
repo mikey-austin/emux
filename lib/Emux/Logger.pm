@@ -12,16 +12,13 @@ sub new {
         _config     => $config,
         _syslog     => 0,
         _stderr     => 0,
+        _prefix     => 1,
         _on_message => $args{on_message} || sub {},
     };
     bless $self, $class;
 
-    if (defined $self->{_config}->get('logger')) {
-        $self->{_syslog} = 1
-            if $self->{_config}->get('logger') eq 'syslog';
-        $self->{_stderr} = 1
-            if $self->{_config}->get('logger') eq 'stderr';
-    }
+    $self->logger($self->{_config}->get('logger'))
+        if defined $self->{_config}->get('logger');
 
     foreach my $level (qw/err warn info debug/) {
         no strict 'refs';
@@ -41,6 +38,19 @@ sub on_message {
     $self->{_on_message} = $callback;
 }
 
+sub logger {
+    my ($self, $logger) = @_;
+    $self->{_syslog} = 1
+        if $logger eq 'syslog';
+    $self->{_stderr} = 1
+        if $logger eq 'stderr';
+}
+
+sub prefix {
+    my ($self, $prefix) = @_;
+    $self->{_prefix} = $prefix ? 1 : 0;
+}
+
 sub log_message {
     my ($self, $message, $priority) = @_;
     $priority ||= 'warning';
@@ -52,7 +62,8 @@ sub log_message {
     }
     elsif ($self->{_stderr}) {
         my $timestamp = strftime "%F %T", localtime;
-        print STDERR "[$timestamp $$]: $message\n";
+        my $prefix = $self->{_prefix} ? "[$timestamp $$]: " : '';
+        print STDERR "$prefix$message\n";
     }
 
     $self->{_on_message}->($message)
