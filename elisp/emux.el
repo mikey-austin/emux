@@ -1,4 +1,24 @@
-;; -*- lexical-binding: t -*-
+;;; emux.el --- Frontend for the emux tool. -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2016 Maxim Velesyuk, Michael Austin and Raphael Sousa Santos
+
+;; Author: Maxim Velesyuk <email>, Michael Austin <email> and Raphael Sousa Santos <contact@raphaelss.com>
+;; URL:
+;; Package-Requires:
+;; Version: 0.1
+;; Keywords:
+
+;; This file is not part of GNU Emacs.
+
+;;; License:
+
+;; Licensed under the same terms as Emacs.
+
+;;; Commentary:
+
+;; Brief description of usage
+
+;;; Code:
 
 (require 'json)
 (require 'subr-x)
@@ -48,15 +68,6 @@
          (:ok ,@body)))))
 (put 'emux--result-do 'lisp-indent-function 1)
 
-(defun emux--result-seq (list)
-  (block func-body
-    (let ((unwrapped ()))
-     (dolist (res list)
-       (emux--result-match (val res)
-         (:ok (push val unwrapped))
-         (:error (return-from func-body res))))
-     (emux--result-ok (nreverse unwrapped)))))
-
 (defun emux--result-seq-map (f xs)
   (block func-body
    (let ((result ()))
@@ -65,6 +76,17 @@
          (emux--result-match (val f-x)
            (:ok (push val result))
            (:error (return-from func-body f-x))))))))
+
+(defun emux--result-seq-fzip (fs xs)
+  (block func-body
+    (let ((result ()))
+      (while (and fs xs)
+        (let ((f-x (funcall (pop fs)
+                            (pop xs))))
+          (emux--result-match (val f-x)
+            (:ok (push val result))
+            (:error (return-from func-body f-x)))))
+      (emux--result-ok (nreverse result)))))
 
 (defun emux--puthash (key value table)
   "Insert the KEY VALUE pair into TABLE with the VALUE wrapped into an emux--result."
@@ -185,12 +207,12 @@
   (intern (concat prefix-str
                   (symbol-name symb))))
 
-(defun emux--message-alist (type-var symbol-list)
-  (cons 'list (cons `(cons "type" ,type-var)
-                    (reduce (lambda (acc s)
-                              (cons `(cons ,(symbol-name s),s)
-                                    acc))
-                            symbol-list :initial-value ()))))
+(defun emux--message-alist (type symbol-list)
+  `(list '("type" . ,type)
+         ,@(reduce (lambda (acc s)
+                     (cons `(cons ,(symbol-name s) ,s)
+                           acc))
+                   symbol-list :initial-value ())))
 
 (defmacro emux--defmessage-type (name args &rest body)
   (let ((arg-names (mapcar 'car args))
@@ -204,10 +226,8 @@
                                          ',spec-sexps)))
        (emux--result-match (,specs-val ,specs)
          (:ok (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
-                (emux--result-match (,val (emux--result-seq (mapcar* (lambda (p x)
-                                                                       (funcall p x))
-                                                                     ,specs-val
-                                                                     (list ,@arg-names))))
+                (emux--result-match (,val (emux--result-seq-fzip ,specs-val
+                                                                 (list ,@arg-names)))
                   (:ok (emux--send-message ,(emux--message-alist type-as-string
                                                                  arg-names))
                        ,@body)
@@ -236,7 +256,6 @@
 (defun emux--add-log (line)
   (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
                                    line "\n"))
-
 
 (emux--defspec string () data
   (stringp data))
@@ -292,4 +311,8 @@
   (delete-process emux--process-name))
 
 (defun emux-running? ()
-  (process-live-p emux--process-name))
+  (and (process-live-p emux--process-name)
+       t))
+
+(provide 'emux)
+;;; emux.el ends here
