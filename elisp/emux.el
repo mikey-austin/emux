@@ -23,9 +23,12 @@
 (require 'json)
 (require 'subr-x)
 
-(defvar emux--process-name "emux")
 (defvar emux-path "emux")
 (defconst emux-log-buffer-name "*emux-logs*")
+
+(defvar emux--process-name "emux")
+(defvar emux--spec-table (make-hash-table :test 'eq))
+(defvar emux--response-type-table (make-hash-table :test 'equal))
 
 (defun emux--partial-apply (f args)
   (lambda (&rest rest)
@@ -99,9 +102,6 @@
         val
       (emux--result-error not-found))))
 
-;; Field specs
-(defvar emux--spec-table (make-hash-table :test 'eq))
-
 (cl-defstruct emux--spec
   arity
   func)
@@ -147,8 +147,6 @@
 (defun emux--getspec-pred (spec-s)
   (emux--result-do (f (emux--getspec-func spec-s))
     (emux--result-ok (emux--partial-funcall 'emux--spec-wrap-predicate spec-s f))))
-
-(defvar emux--response-type-table (make-hash-table :test 'equal))
 
 (defun emux--validate-apply (args-and-specs func obj)
   (emux--result-do (values (emux--result-seq-map (lambda (x)
@@ -277,24 +275,24 @@
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) ""))
 
-(emux--defmessage-type execute ((id string)
-                                (command string)
-                                (machine (option string))
-                                (tags (option (vector string)))))
-
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))
     (if (null id)
         (emux--add-log content)
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
 
+(emux--defmessage-type execute ((id string)
+                                (command string)
+                                (machine (option string))
+                                (tags (option (vector string)))))
+
 (emux--defmessage-type state ())
 
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string)))))
 
-(defun emux-start-client (&optional path)
-  (interactive "MSocket path: ")
+(defun emux-start-client (&optional path) ()
+  (interactive (list (read-string "Socket: " (getenv "EMUX_SOCKET") nil nil t))))
   (when (emux-running?)
     (emux-finish-client))
   (if (and path
