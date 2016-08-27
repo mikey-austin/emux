@@ -23,7 +23,7 @@ sub new {
         _listeners   => [],
         _procs       => {},
         _proc_errors => {},
-        _clients     => [],
+        _clients     => {},
         _select      => IO::Select->new,
     };
     bless $self, $class;
@@ -82,7 +82,7 @@ sub start {
                     }
                     $self->{_logger}->info("Accepted connection from $from");
                     $self->{_select}->add($client);
-                    push @{$self->{_clients}}, $client;
+                    $self->{_clients}->{$client} = $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
                     my $process = $self->{_procs}->{fileno($handle)};
@@ -97,6 +97,10 @@ sub start {
                 else {
                     my ($message, $error);
                     eval {
+                        # Check if the client disconnected.
+                        $self->disconnect($handle)
+                            unless $handle->can('connected') and $handle->connected;
+
                         $message = Emux::Message->from_handle($handle, $self->{_cmd_factory});
                         $message->command->execute
                             if $message and $message->command;
@@ -109,18 +113,23 @@ sub start {
                         $self->{_logger}->err("error processing message: $error");
                     }
                     elsif (not (defined $message and defined $message->command)) {
-                        $self->{_logger}->err('could not understand message');
+                        $self->disconnect($handle);
                     }
-
-                    # Keep connection open for the moment...
-                    #$self->{_select}->remove($handle);
-                    #$handle->close;
                 }
             }
         }
     }
 
     # Never reached.
+}
+
+sub disconnect {
+    my ($self, $handle) = @_;
+    $self->{_logger}->info('client disconnected');
+    $self->{_select}->remove($handle);
+    $handle->close
+        if $handle->can('close');
+    delete $self->{_clients}->{$handle};
 }
 
 sub register_listeners {
@@ -226,7 +235,7 @@ sub handle_proc_output {
 sub broadcast_message {
     my ($self, $message) = @_;
     printf { $_ } "%s\n", $message->encode
-        foreach @{$self->{_clients}};
+        foreach values %{$self->{_clients}};
 }
 
 sub daemonize {
@@ -290,6 +299,7 @@ sub save_pid {
 sub register_signals {
     my $self = shift;
 
+    $SIG{'PIPE'} = 'IGNORE';
     $SIG{'INT'} = $SIG{'TERM'} = sub {
         $self->shutdown;
         exit;
