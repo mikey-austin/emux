@@ -176,11 +176,6 @@
                            (warn "unknown type"))))
                   (:error (warn alist-val))))))
 
-(defun emux--add-log (line)
-  (with-current-buffer (get-buffer-create emux-log-buffer-name)
-    (insert line)
-    (newline)))
-
 (defun emux--send-message (args)
   (process-send-string emux--process-name
                        (concat (json-encode (remove-if-not 'cdr args))
@@ -220,6 +215,29 @@
          (:error (error ,specs-val))))))
 (put 'emux--defmessage-type 'lisp-indent-function 2)
 
+(defun emux--write-to-scrolling-buffer (buffer &rest strings)
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((initial-point-max (point-max)))
+        (save-excursion
+          (goto-char (point-max))
+          (mapc #'insert strings))
+        (dolist (window (get-buffer-window-list buffer nil 0))
+          (when (= (window-point window)
+                   initial-point-max)
+            (set-window-point window (point-max))))))))
+
+(defun emux--write-to-emux-buffer (section content)
+  (let ((buffer (process-buffer (get-process emux--process-name))))
+    (emux--write-to-scrolling-buffer buffer
+                                     "\n=== " section " ===\n"
+                                     content)))
+
+(defun emux--add-log (line)
+  (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
+                                   line "\n"))
+
+
 (emux--defspec string () data
   (stringp data))
 
@@ -243,18 +261,6 @@
                                 (command string)
                                 (machine (option string))
                                 (tags (option (vector string)))))
-
-(defun emux--write-to-emux-buffer (section content)
-  (let ((proc (get-process emux--process-name)))
-    (when (buffer-live-p (process-buffer proc))
-      (with-current-buffer (process-buffer proc)
-        (let ((moving (= (point) (process-mark proc))))
-          (save-excursion
-            (goto-char (process-mark proc))
-            (insert (concat "\n=== " section " ===\n"))
-            (insert content)
-            (set-marker (process-mark proc) (point)))
-          (if moving (goto-char (process-mark proc))))))))
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))
