@@ -9,7 +9,7 @@ use constant {
         daemonize        => 0,
         pidfile          => '/tmp/emux.pid',
         logger           => undef,
-        socket           => $ENV{EMUX_SOCKET} || undef,
+        socket           => $ENV{EMUX_SOCKET} || '/tmp/emux.sock',
         user             => undef,
         group            => undef,
         host             => undef,
