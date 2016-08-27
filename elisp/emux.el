@@ -7,27 +7,12 @@
 (defvar emux-path "emux")
 (defconst emux-log-buffer-name "*emux-logs*")
 
-(cl-defstruct emux--closure
-  vars
-  func)
-
 (defun emux--partial-apply (f args)
-  (if (emux--closure-p f)
-      (make-emux--closure :func (emux--closure-func f)
-                          :vars (append (emux--closure-vars f) args))
-    (make-emux--closure :func f
-                        :vars args)))
+  (lambda (&rest rest)
+    (apply f (append args rest))))
 
 (defun emux--partial-funcall (f &rest args)
   (emux--partial-apply f args))
-
-(defun emux--apply (f args)
-  (if (emux--closure-p f)
-      (apply (emux--closure-func f) (append (emux--closure-vars f) args))
-    (apply f args)))
-
-(defun emux--funcall (f &rest args)
-  (emux--apply f args))
 
 ;; result type encoding a value and a error case.
 (cl-defstruct emux--result
@@ -76,7 +61,7 @@
   (block func-body
    (let ((result ()))
      (dolist (x xs (emux--result-ok (nreverse result)))
-       (let ((f-x (emux--funcall f x)))
+       (let ((f-x (funcall f x)))
          (emux--result-match (val f-x)
            (:ok (push val result))
            (:error (return-from func-body f-x))))))))
@@ -100,7 +85,7 @@
   func)
 
 (defun emux--spec-wrap-predicate (spec-s pred x)
-  (let ((success (emux--funcall pred x)))
+  (let ((success (funcall pred x)))
     (if success
         (emux--result-ok x)
       (emux--result-error (format "%S is not a valid %S" x spec-s)))))
@@ -145,10 +130,10 @@
 
 (defun emux--validate-apply (args-and-specs func obj)
   (emux--result-do (values (emux--result-seq-map (lambda (x)
-                                                   (emux--funcall (cdr x)
-                                                                  (cdr (assoc (car x) obj))))
+                                                   (funcall (cdr x)
+                                                            (cdr (assoc (car x) obj))))
                                                  args-and-specs))
-    (emux--result-ok (emux--apply func values))))
+    (emux--result-ok (apply func values))))
 
 (defun emux--extract-arg-name-and-spec (x)
   (let ((name (symbol-name (car x)))
@@ -185,7 +170,7 @@
              do (emux--result-match (alist-val (emux--json-decode l))
                   (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
                          (if handler
-                             (emux--result-match (val (emux--funcall handler alist-val))
+                             (emux--result-match (val (funcall handler alist-val))
                                (:ok t)
                                (:error (warn val)))
                            (warn "unknown type"))))
@@ -225,7 +210,7 @@
        (emux--result-match (,specs-val ,specs)
          (:ok (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
                 (emux--result-match (,val (emux--result-seq (mapcar* (lambda (p x)
-                                                                       (emux--funcall p x))
+                                                                       (funcall p x))
                                                                      ,specs-val
                                                                      (list ,@arg-names))))
                   (:ok (emux--send-message ,(emux--message-alist type-as-string
@@ -247,7 +232,7 @@
 
 (emux--defspec option (a) data
   (or (not data)
-      (emux--funcall a data)))
+      (funcall a data)))
 
 (emux--defresponse-type output ((id string) (content string))
   (emux--write-to-emux-buffer id (base64-decode-string content)))
