@@ -283,9 +283,11 @@
                              (tags (option (vector string)))))
 
 (defun emux-start-client (&optional path)
+  (interactive "MSocket path: ")
   (when (emux-running?)
     (emux-finish-client))
-  (if path
+  (if (and path
+           (not (string= "" (string-trim path))))
       (make-network-process :name emux--process-name
                             :buffer "*emux*"
                             :filter #'emux--process-filter
@@ -295,6 +297,7 @@
                           #'emux--process-filter))))
 
 (defun emux-finish-client ()
+  (interactive)
   (delete-process emux--process-name))
 
 (defun emux-running? ()
