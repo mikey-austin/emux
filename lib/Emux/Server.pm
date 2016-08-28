@@ -262,7 +262,7 @@ sub handle_proc_output {
     do {
         $line = readline($handle);
         $output .= $line
-        if $line;
+            if $line;
     } while ($line and $select->can_read(1));
     return if not $output;
 
