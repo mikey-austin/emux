@@ -17,7 +17,7 @@ sub new {
         _master_opts => $args{master_opts} || '',
         _procs       => {},
         _masters     => {},
-        _tags        => [],
+        _tags        => {},
     };
     bless $self, $class;
 
@@ -84,7 +84,22 @@ sub masters {
 }
 
 sub running_tags {
-    shift->{_tags}
+    keys %{shift->{_tags}}
+}
+
+sub expand_tags {
+    my ($self, @tags) = @_;
+
+    my %ids;
+    foreach my $tag (@tags) {
+        if ($self->{_tags}->{$tag}) {
+            foreach my $id (keys %{$self->{_tags}->{$tag}}) {
+                $ids{$id} = 1;
+            }
+        }
+    }
+
+    return keys %ids;
 }
 
 sub _register_process {
@@ -93,6 +108,12 @@ sub _register_process {
     $self->{_procs}->{id}->{$process->id} = $process;
     $self->{_procs}->{pid}->{$process->pid} = $process;
     $self->{_masters}->{$process->host}->{procs}->{$process->id} = $process;
+
+    # Register tags.
+    foreach my $tag (@{$process->tags}) {
+        $self->{_tags}->{$tag} = {} unless $self->{_tags}->{$tag};
+        $self->{_tags}->{$tag}->{$process->id} = $process;
+    }
 }
 
 sub _deregister_process {
@@ -100,6 +121,12 @@ sub _deregister_process {
 
     $self->{_logger}->debug(
         'de-registering process id %s; %s', $process->id, $process->pid);
+    foreach my $tag (@{$process->tags}) {
+        delete $self->{_tags}->{$tag}->{$process->id};
+        delete $self->{_tags}->{$tag}
+            unless %{$self->{_tags}->{$tag}};
+    }
+        ;
     delete $self->{_procs}->{id}->{$process->id};
     delete $self->{_procs}->{pid}->{$process->pid};
     delete $self->{_masters}->{$process->host}->{procs}->{$process->id};

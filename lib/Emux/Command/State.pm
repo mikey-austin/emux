@@ -12,7 +12,7 @@ sub execute {
     my $proc_manager = $self->server->proc_manager;
     my $message = Emux::Message->new(TYPE_STATE);
     $message->body({
-        tags => $proc_manager->running_tags,
+        tags => [ $proc_manager->running_tags ],
         processes => [
             map {
                 id      => $_->id,
