@@ -1,4 +1,4 @@
-package Emux::Command::Stop;
+package Emux::Command::Mute;
 
 use strict;
 use warnings;
@@ -14,9 +14,13 @@ sub execute {
         $message->{_body}->{tags} || [],
     );
 
-    my $proc_manager = $self->server->proc_manager;
-    $proc_manager->stop_process_ids(@ids)
+    $self->process_ids(@ids)
         if @ids > 0;
+}
+
+sub process_ids {
+    my ($self, @ids) = @_;
+    $self->server->mute_ids(@ids);
 }
 
 1;

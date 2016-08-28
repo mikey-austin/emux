@@ -9,10 +9,12 @@ use Emux::Message qw(:constants);
 sub execute {
     my $self = shift;
 
-    my $proc_manager = $self->server->proc_manager;
+    my $server = $self->server;
+    my $proc_manager = $server->proc_manager;
     my $message = Emux::Message->new(TYPE_STATE);
     $message->body({
-        tags => [ $proc_manager->running_tags ],
+        tags  => [ $proc_manager->running_tags ],
+        muted => [ $server->muted ],
         processes => [
             map {
                 id      => $_->id,
@@ -23,7 +25,7 @@ sub execute {
             }, $proc_manager->procs
         ]
     });
-    $self->server->broadcast_message($message);
+    $server->broadcast_message($message);
 }
 
 1;

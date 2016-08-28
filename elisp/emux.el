@@ -293,6 +293,9 @@
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string)))))
 
+(emux--defmessage-type unmute ((id (option (vector string)))
+                             (tags (option (vector string)))))
+
 (emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string)))))
 
