@@ -265,6 +265,9 @@
   (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
                                    line "\n"))
 
+(defun emux--assoc-cdr (key alist)
+  (cdr (assoc key alist)))
+
 (emux--defspec string () data
   (stringp data))
 
@@ -280,11 +283,11 @@
       (funcall a data)))
 
 (emux--defspec process () data
-  (and (integerp (assoc-cdr "created" data))
-       (stringp (assoc-cdr "command" data))
-       (stringp (assoc-cdr "machine" data))
-       (stringp (assoc-cdr "id" data))
-       (let ((tags (assoc-cdr "tags" data)))
+  (and (integerp (emux--assoc-cdr "created" data))
+       (stringp (emux--assoc-cdr "command" data))
+       (stringp (emux--assoc-cdr "machine" data))
+       (stringp (emux--assoc-cdr "id" data))
+       (let ((tags (emux--assoc-cdr "tags" data)))
          (and (vectorp tags)
               (every #'stringp tags)))))
 
