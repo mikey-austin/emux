@@ -275,6 +275,8 @@
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) ""))
 
+(emux--defresponse-type state ())
+
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))
     (if (null id)
@@ -289,6 +291,9 @@
 (emux--defmessage-type state ())
 
 (emux--defmessage-type mute ((id (option (vector string)))
+                             (tags (option (vector string)))))
+
+(emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string)))))
 
 (defun emux-start-client (&optional path)

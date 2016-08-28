@@ -10,6 +10,7 @@ use constant {
     TYPE_EXECUTE      => 'execute',
     TYPE_OUTPUT       => 'output',
     TYPE_STATE        => 'state',
+    TYPE_STOP         => 'stop',
     TYPE_ERROR_OUTPUT => 'error_output',
     TYPE_FINISHED     => 'finished',
 };
@@ -18,6 +19,7 @@ our @constants = qw(
     TYPE_EXECUTE
     TYPE_OUTPUT
     TYPE_STATE
+    TYPE_STOP
     TYPE_ERROR_OUTPUT
     TYPE_FINISHED
 );

@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use parent qw(Emux::Command);
 
-use Emux::Process;
 use Emux::Message qw(:constants);
 
 sub execute {

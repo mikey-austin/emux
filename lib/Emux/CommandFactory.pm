@@ -22,6 +22,9 @@ sub create {
     elsif ($type eq Emux::Message->TYPE_STATE) {
         $class = 'State';
     }
+    elsif ($type eq Emux::Message->TYPE_STOP) {
+        $class = 'Stop';
+    }
     else {
         die "could not make command of type $type";
     }

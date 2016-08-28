@@ -52,6 +52,16 @@ sub run_process {
     $self->_register_process($process);
 }
 
+sub stop_process_ids {
+    my ($self, @ids) = @_;
+
+    foreach my $id (@ids) {
+        my $process = $self->{_procs}->{id}->{$id};
+        $self->stop_process($process)
+            if $process;
+    }
+}
+
 sub stop_process {
     my ($self, $process) = @_;
 
