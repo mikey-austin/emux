@@ -27,15 +27,7 @@
 (defconst emux-log-buffer-name "*emux-logs*")
 
 (defvar emux--process-name "emux")
-(defvar emux--spec-table (make-hash-table :test 'eq))
 (defvar emux--response-type-table (make-hash-table :test 'equal))
-
-(defun emux--partial-apply (f args)
-  (lambda (&rest rest)
-    (apply f (append args rest))))
-
-(defun emux--partial-funcall (f &rest args)
-  (emux--partial-apply f args))
 
 ;; result type encoding a value and a error case.
 (cl-defstruct emux--result
@@ -91,86 +83,58 @@
             (:error (return-from func-body f-x)))))
       (emux--result-ok (nreverse result)))))
 
-(defun emux--puthash (key value table)
-  "Insert the KEY VALUE pair into TABLE with the VALUE wrapped into an emux--result."
-  (puthash key (emux--result-ok value) table))
+(defun emux--spec-wrap-predicate (spec-s pred)
+  (lambda (x)
+    (let ((success (funcall pred x)))
+      (if success
+          (emux--result-ok x)
+        (emux--result-error (format "%S is not a valid %S" x spec-s))))))
 
-(defun emux--gethash (key table not-found)
-  "Retrieve the value for KEY in TABLE.  Return (emux--result-error NOT-FOUND) if there's no value for KEY."
-  (let ((val (gethash key table)))
-    (if val
-        val
-      (emux--result-error not-found))))
-
-(cl-defstruct emux--spec
-  arity
-  func)
-
-(defun emux--spec-wrap-predicate (spec-s pred x)
-  (let ((success (funcall pred x)))
-    (if success
-        (emux--result-ok x)
-      (emux--result-error (format "%S is not a valid %S" x spec-s)))))
+(defun emux--make-spec-func-name (name)
+  (emux--prefix-symbol "emux--spec-" name))
 
 (defmacro emux--defspec (name type-args data-var &rest body)
-  `(emux--puthash ',name
-                  (make-emux--spec :arity ,(length type-args)
-                                   :func (lambda (,@type-args ,data-var)
-                                           ,@body))
-                  emux--spec-table))
+  `(defun ,(emux--make-spec-func-name name) (,@type-args)
+     (lambda (,data-var)
+       ,@body)))
 (put 'emux--defspec 'lisp-indent-function 3)
 
-(defun emux--fetch-spec (name)
-  (emux--gethash name
-                 emux--spec-table
-                 (format "%S is not a known spec" name)))
-
-(defun emux--normalize-spec-sexp (spec-s)
-  (cond ((symbolp spec-s) (list spec-s))
-        ((null (cdr spec-s)) (emux--normalize-spec-sexp (car spec-s)))
-        (t spec-s)))
+(defun emux--getspec-sexp (spec-s)
+  (if (symbolp spec-s)
+      (list (emux--make-spec-func-name spec-s))
+    (cons (emux--make-spec-func-name (car spec-s))
+          (mapcar 'emux--getspec-sexp (cdr spec-s)))))
 
 (defun emux--getspec-pred (spec-s)
-  (let* ((normalized-spec-s (emux--normalize-spec-sexp spec-s))
-         (name (car normalized-spec-s))
-         (arg-list (cdr normalized-spec-s)))
-    (emux--result-do (spec (emux--fetch-spec name))
-      (let ((arity (emux--spec-arity spec))
-            (func (emux--spec-func spec)))
-        (cond ((/= (length arg-list) arity)
-               (emux--result-error (format "Spec %S has arity %i and can't be used with %S as arguments"
-                                           name arity arg-list)))
-              ((= arity 0) (emux--result-ok func))
-              (t (emux--result-do (args (emux--result-seq-map 'emux--getspec-pred arg-list))
-                   (emux--result-ok (emux--partial-apply func args)))))))))
+  (if (symbolp spec-s)
+      (funcall (emux--make-spec-func-name spec-s))
+    (apply (emux--make-spec-func-name (car spec-s))
+           (mapcar 'emux--getspec-pred (cdr spec-s)))))
 
 (defun emux--getspec-func (spec-s)
-  (emux--result-do (f (emux--getspec-pred spec-s))
-    (emux--result-ok (emux--partial-funcall 'emux--spec-wrap-predicate spec-s f))))
-
-(defun emux--validate-apply (args-and-specs func obj)
-  (emux--result-do (values (emux--result-seq-map (lambda (x)
-                                                   (funcall (cdr x)
-                                                            (cdr (assoc (car x) obj))))
-                                                 args-and-specs))
-    (emux--result-ok (apply func values))))
+  (emux--spec-wrap-predicate spec-s (emux--getspec-pred spec-s)))
 
 (defun emux--extract-arg-name-and-spec (x)
   (let ((name (symbol-name (car x)))
         (spec-s (cadr x)))
-    (emux--result-do (spec (emux--getspec-func spec-s))
-      (emux--result-ok (cons name spec)))))
+    (cons name (emux--getspec-func spec-s))))
 
-(defun emux--make-args-and-specs (arg-list)
-  (emux--result-seq-map 'emux--extract-arg-name-and-spec arg-list))
+(defun emux--validate-apply (args-and-specs func)
+  (lambda (obj)
+    (emux--result-do (values (emux--result-seq-map (lambda (x)
+                                                     (funcall (cdr x)
+                                                              (cdr (assoc (car x) obj))))
+                                                   args-and-specs))
+      (emux--result-ok (apply func values)))))
 
 (defmacro emux--defresponse-type (name args &rest body)
   (let* ((args-and-specs (cl-gensym))
          (arg-names (mapcar 'car args))
          (func `(lambda ,arg-names ,@body)))
-    `(emux--result-do (,args-and-specs (emux--make-args-and-specs ',args))
+    `(let ((,args-and-specs (mapcar 'emux--extract-arg-name-and-spec
+                                    ',args)))
        (puthash (symbol-name ',name)
-                (emux--partial-funcall 'emux--validate-apply ,args-and-specs ,func)
+                (emux--validate-apply ,args-and-specs ,func)
                 emux--response-type-table))))
 (put 'emux--defresponse-type 'lisp-indent-function 2)
 
@@ -183,7 +147,7 @@
           (emux--result-ok obj))
       (error (emux--result-error err)))))
 
-(defun last-char-is-}? (str)
+(defun emux--last-char-is-}? (str)
   (eq ?\} (aref str (- (length str) 1))))
 
 (let ((rest nil))
@@ -195,9 +159,10 @@
            (when rest
              (setf trimmed (concat rest trimmed)
                    rest nil))
-           (if (last-char-is-}? trimmed)
+           (if (emux--last-char-is-}? trimmed)
                (emux--result-match (alist-val (emux--json-decode trimmed))
-                 (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
+                 (:ok (let ((handler (gethash (cdr (assoc "type" alist-val))
+                                              emux--response-type-table)))
                         (if handler
                             (emux--result-match (val (funcall handler alist-val))
                               (:ok t)
@@ -229,18 +194,16 @@
         (specs-val (cl-gensym))
         (val (cl-gensym))
         (type-as-string (symbol-name name)))
-    `(let ((,specs (emux--result-seq-map (lambda (as)
-                                           (emux--getspec-func as))
-                                         ',spec-sexps)))
-       (emux--result-match (,specs-val ,specs)
-         (:ok (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
-                (emux--result-match (,val (emux--result-seq-fzip ,specs-val
-                                                                 (list ,@arg-names)))
-                  (:ok (emux--send-message ,(emux--message-alist type-as-string
-                                                                 arg-names))
-                       ,@body)
-                  (:error (error ,val)))))
-         (:error (error ,specs-val))))))
+    `(let ((,specs (mapcar (lambda (as)
+                             (emux--getspec-func as))
+                           ',spec-sexps)))
+       (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
+         (emux--result-match (,val (emux--result-seq-fzip ,specs
+                                                          (list ,@arg-names)))
+           (:ok (emux--send-message ,(emux--message-alist type-as-string
+                                                          arg-names))
+                ,@body)
+           (:error (error ,val)))))))
 (put 'emux--defmessage-type 'lisp-indent-function 2)
 
 (defun emux--write-to-scrolling-buffer (buffer &rest strings)
@@ -268,6 +231,15 @@
 (defun emux--assoc-cdr (key alist)
   (cdr (assoc key alist)))
 
+(defmacro emux--obj-with-keys (obj &rest key-type-pairs)
+  `(and (listp ,obj)
+        ,@(mapcar (lambda (pair)
+                    (let ((key (symbol-name (car pair)))
+                          (type (cadr pair)))
+                      `(funcall ,(emux--getspec-sexp type)
+                                (cdr (assoc ,key ,obj)))))
+                  key-type-pairs)))
+
 (emux--defspec string () data
   (stringp data))
 
@@ -283,13 +255,12 @@
       (funcall a data)))
 
 (emux--defspec process () data
-  (and (integerp (emux--assoc-cdr "created" data))
-       (stringp (emux--assoc-cdr "command" data))
-       (stringp (emux--assoc-cdr "machine" data))
-       (stringp (emux--assoc-cdr "id" data))
-       (let ((tags (emux--assoc-cdr "tags" data)))
-         (and (vectorp tags)
-              (every #'stringp tags)))))
+  (emux--obj-with-keys data
+    (created integer)
+    (command string)
+    (machine (option string))
+    (id string)
+    (tags (vector string))))
 
 (emux--defresponse-type output ((id string) (content string))
   (emux--write-to-emux-buffer id (base64-decode-string content)))
