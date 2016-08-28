@@ -282,7 +282,7 @@
 (emux--defspec process () data
   (and (integerp (assoc-cdr "created" data))
        (stringp (assoc-cdr "command" data))
-       (stringp (assoc-cdr "host" data))
+       (stringp (assoc-cdr "machine" data))
        (stringp (assoc-cdr "id" data))
        (let ((tags (assoc-cdr "tags" data)))
          (and (vectorp tags)
@@ -293,8 +293,6 @@
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) ""))
-
-(emux--defresponse-type state ())
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))

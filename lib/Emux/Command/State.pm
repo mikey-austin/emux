@@ -18,7 +18,7 @@ sub execute {
         processes => [
             map {
                 id      => $_->id,
-                host    => $_->host,
+                state   => $_->host,
                 command => $_->command,
                 created => int $_->created,
                 tags    => $_->tags,
