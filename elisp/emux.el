@@ -301,6 +301,7 @@
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
 
 (emux--defresponse-type state ((tags (vector string))
+                               (muted (vector string))
                                (processes (vector process)))
   (emux--write-to-emux-buffer "state" (format "%S\n" processes)))
 
