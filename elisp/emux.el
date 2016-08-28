@@ -183,18 +183,28 @@
           (emux--result-ok obj))
       (error (emux--result-error err)))))
 
-(defun emux--process-filter (process output)
-  (let ((lines (split-string output "\n")))
-    (cl-loop for l in lines
-             unless (string= "" (string-trim l))
-             do (emux--result-match (alist-val (emux--json-decode l))
-                  (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
-                         (if handler
-                             (emux--result-match (val (funcall handler alist-val))
-                               (:ok t)
-                               (:error (warn val)))
-                           (warn "unknown type"))))
-                  (:error (warn alist-val))))))
+(defun last-char-is-}? (str)
+  (eq ?\} (aref str (- (length str) 1))))
+
+(let ((rest nil))
+ (defun emux--process-filter (process output)
+   (let ((lines (split-string output "\n")))
+     (dolist (l lines)
+       (let ((trimmed (string-trim l)))
+         (unless (string= "" trimmed)
+           (when rest
+             (setf trimmed (concat rest trimmed)
+                   rest nil))
+           (if (last-char-is-}? trimmed)
+               (emux--result-match (alist-val (emux--json-decode trimmed))
+                 (:ok (let ((handler (gethash (cdr (assoc "type" alist-val)) emux--response-type-table)))
+                        (if handler
+                            (emux--result-match (val (funcall handler alist-val))
+                              (:ok t)
+                              (:error (warn val)))
+                          (warn "unknown type"))))
+                 (:error (warn alist-val)))
+             (setf rest trimmed))))))))
 
 (defun emux--send-message (args)
   (process-send-string emux--process-name
@@ -269,6 +279,15 @@
   (or (not data)
       (funcall a data)))
 
+(emux--defspec process () data
+  (and (integerp (assoc-cdr "created" data))
+       (stringp (assoc-cdr "command" data))
+       (stringp (assoc-cdr "host" data))
+       (stringp (assoc-cdr "id" data))
+       (let ((tags (assoc-cdr "tags" data)))
+         (and (vectorp tags)
+              (every #'stringp tags)))))
+
 (emux--defresponse-type output ((id string) (content string))
   (emux--write-to-emux-buffer id (base64-decode-string content)))
 
@@ -280,6 +299,10 @@
     (if (null id)
         (emux--add-log content)
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
+
+(emux--defresponse-type state ((tags (vector string))
+                               (processes (vector process)))
+  (emux--write-to-emux-buffer "state" (format "%S\n" processes)))
 
 (emux--defmessage-type execute ((id string)
                                 (command string)
