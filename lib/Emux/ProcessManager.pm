@@ -17,6 +17,7 @@ sub new {
         _master_opts => $args{master_opts} || '',
         _procs       => {},
         _masters     => {},
+        _tags        => [],
     };
     bless $self, $class;
 
@@ -70,6 +71,10 @@ sub procs {
 sub masters {
     my $self = shift;
     return map $self->{_masters}->{$_}, keys %{$self->{_masters}};
+}
+
+sub running_tags {
+    shift->{_tags}
 }
 
 sub _register_process {

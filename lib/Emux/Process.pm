@@ -10,6 +10,9 @@ sub new {
         _host    => $args{host} || 'localhost',
         _on_run  => $args{on_run},
         _on_exit => $args{on_exit},
+        _tags    => $args{tags} || [],
+        _command => $args{command} || '',
+        _created => scalar time,
         _pid     => undef,
         _fh      => undef, # The parent filehandle
         _errors  => undef, # The stderr filehandle
@@ -17,7 +20,7 @@ sub new {
     bless $self, $class;
 
     # Set some getters/setters.
-    foreach my $var (qw/id host fh pid errors/) {
+    foreach my $var (qw/id host fh pid errors created tags command/) {
         no strict 'refs';
         *{"$class::$var"} = sub {
             my ($self, $arg) = @_;

@@ -19,11 +19,8 @@ sub create {
     if ($type eq Emux::Message->TYPE_EXECUTE) {
         $class = 'Execute';
     }
-    elsif ($type eq Emux::Message->TYPE_OUTPUT) {
-        $class = 'Output';
-    }
-    elsif ($type eq Emux::Message->TYPE_FINISHED) {
-        $class = 'Finished';
+    elsif ($type eq Emux::Message->TYPE_STATE) {
+        $class = 'State';
     }
     else {
         die "could not make command of type $type";

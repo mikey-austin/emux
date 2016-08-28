@@ -9,6 +9,7 @@ use JSON;
 use constant {
     TYPE_EXECUTE      => 'execute',
     TYPE_OUTPUT       => 'output',
+    TYPE_STATE        => 'state',
     TYPE_ERROR_OUTPUT => 'error_output',
     TYPE_FINISHED     => 'finished',
 };
@@ -16,6 +17,7 @@ use constant {
 our @constants = qw(
     TYPE_EXECUTE
     TYPE_OUTPUT
+    TYPE_STATE
     TYPE_ERROR_OUTPUT
     TYPE_FINISHED
 );

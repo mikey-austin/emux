@@ -25,9 +25,10 @@ sub execute {
     }
 
     my $process = Emux::Process->new(
-        id     => $self->{_id},
-        host   => $self->{_host},
-        on_run => sub { exec $cmd; },
+        id      => $self->{_id},
+        host    => $self->{_host},
+        command => $self->{_command},
+        on_run  => sub { exec $cmd; },
         on_exit => sub {
             my ($process, $exit_status) = @_;
             $self->server->deregister_process(
