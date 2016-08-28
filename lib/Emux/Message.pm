@@ -10,6 +10,9 @@ use constant {
     TYPE_EXECUTE      => 'execute',
     TYPE_OUTPUT       => 'output',
     TYPE_STATE        => 'state',
+    TYPE_MUTE         => 'mute',
+    TYPE_UNMUTE       => 'unmute',
+    TYPE_STOP         => 'stop',
     TYPE_ERROR_OUTPUT => 'error_output',
     TYPE_FINISHED     => 'finished',
 };
@@ -18,6 +21,9 @@ our @constants = qw(
     TYPE_EXECUTE
     TYPE_OUTPUT
     TYPE_STATE
+    TYPE_STOP
+    TYPE_MUTE
+    TYPE_UNMUTE
     TYPE_ERROR_OUTPUT
     TYPE_FINISHED
 );

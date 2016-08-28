@@ -23,6 +23,7 @@ sub new {
         _listeners   => [],
         _procs       => {},
         _proc_errors => {},
+        _muted       => {},
         _clients     => {
             $config->get('broadcast_stdout')
                 ? ( "*STDOUT" => *STDOUT ) : ()
@@ -192,6 +193,24 @@ sub proc_manager {
     shift->{_proc_manager};
 }
 
+sub mute_ids {
+    my ($self, @ids) = @_;
+    foreach my $id (@ids) {
+        $self->{_muted}->{$id} = $id;
+    }
+}
+
+sub unmute_ids {
+    my ($self, @ids) = @_;
+    foreach my $id (@ids) {
+        delete $self->{_muted}->{$id};
+    }
+}
+
+sub muted {
+    keys %{shift->{_muted}};
+}
+
 sub register_process {
     my ($self, $process) = @_;
     eval {
@@ -213,6 +232,7 @@ sub deregister_process {
     $self->{_select}->remove($process->fh);
     delete $self->{_procs}->{$process->fh};
     delete $self->{_proc_errors}->{$process->errors};
+    delete $self->{_muted}->{$process->id};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -246,12 +266,17 @@ sub handle_proc_output {
     } while ($line and $select->can_read(1));
     return if not $output;
 
-    my $message = Emux::Message->new($type);
-    $message->body({
-        id      => $process->id,
-        content => encode_base64($output),
-    });
-    $self->broadcast_message($message);
+    unless ($self->{_muted}->{$process->id}) {
+        my $message = Emux::Message->new($type);
+        $message->body({
+            id      => $process->id,
+            content => encode_base64($output),
+        });
+        $self->broadcast_message($message);
+    }
+    else {
+        $self->{_logger}->debug('output for %s muted', $process->id);
+    }
 }
 
 sub broadcast_message {

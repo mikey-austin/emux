@@ -12,6 +12,22 @@ sub new {
     }, $class;
 }
 
+sub expand_and_merge_tags {
+    my ($self, $ids, $tags) = @_;
+
+    my %ids = map { $_ => 1 } @{$ids};
+
+    my $proc_manager = $self->server->proc_manager;
+    my @tagged_ids = $tags
+        ? $proc_manager->expand_tags(@{$tags}) : ();
+
+    # Merge tagged ids and supplied ids.
+    $ids{$_} = 1 foreach @tagged_ids;
+    my @ids = keys %ids;
+
+    return @ids;
+}
+
 sub message {
     my ($self, $message) = @_;
     $self->{_message} = $message if defined $message;

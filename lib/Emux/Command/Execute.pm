@@ -28,6 +28,7 @@ sub execute {
         id      => $self->{_id},
         host    => $self->{_host},
         command => $self->{_command},
+        tags    => $self->{_tags},
         on_run  => sub { exec $cmd; },
         on_exit => sub {
             my ($process, $exit_status) = @_;
