@@ -130,7 +130,7 @@
         ((null (cdr spec-s)) (emux--normalize-spec-sexp (car spec-s)))
         (t spec-s)))
 
-(defun emux--getspec-func (spec-s)
+(defun emux--getspec-pred (spec-s)
   (let* ((normalized-spec-s (emux--normalize-spec-sexp spec-s))
          (name (car normalized-spec-s))
          (arg-list (cdr normalized-spec-s)))
@@ -141,11 +141,11 @@
                (emux--result-error (format "Spec %S has arity %i and can't be used with %S as arguments"
                                            name arity arg-list)))
               ((= arity 0) (emux--result-ok func))
-              (t (emux--result-do (args (emux--result-seq-map 'emux--getspec-func arg-list))
+              (t (emux--result-do (args (emux--result-seq-map 'emux--getspec-pred arg-list))
                    (emux--result-ok (emux--partial-apply func args)))))))))
 
-(defun emux--getspec-pred (spec-s)
-  (emux--result-do (f (emux--getspec-func spec-s))
+(defun emux--getspec-func (spec-s)
+  (emux--result-do (f (emux--getspec-pred spec-s))
     (emux--result-ok (emux--partial-funcall 'emux--spec-wrap-predicate spec-s f))))
 
 (defun emux--validate-apply (args-and-specs func obj)
@@ -158,7 +158,7 @@
 (defun emux--extract-arg-name-and-spec (x)
   (let ((name (symbol-name (car x)))
         (spec-s (cadr x)))
-    (emux--result-do (spec (emux--getspec-pred spec-s))
+    (emux--result-do (spec (emux--getspec-func spec-s))
       (emux--result-ok (cons name spec)))))
 
 (defun emux--make-args-and-specs (arg-list)
@@ -230,7 +230,7 @@
         (val (cl-gensym))
         (type-as-string (symbol-name name)))
     `(let ((,specs (emux--result-seq-map (lambda (as)
-                                           (emux--getspec-pred as))
+                                           (emux--getspec-func as))
                                          ',spec-sexps)))
        (emux--result-match (,specs-val ,specs)
          (:ok (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
