@@ -90,6 +90,10 @@
           (emux--result-ok x)
         (emux--result-error (format "%S is not a valid %S" x spec-s))))))
 
+(defun emux--prefix-symbol (prefix-str symb)
+  (intern (concat prefix-str
+                  (symbol-name symb))))
+
 (defun emux--make-spec-func-name (name)
   (emux--prefix-symbol "emux--spec-" name))
 
@@ -175,10 +179,6 @@
   (process-send-string emux--process-name
                        (concat (json-encode (remove-if-not 'cdr args))
                                "\n")))
-
-(defun emux--prefix-symbol (prefix-str symb)
-  (intern (concat prefix-str
-                  (symbol-name symb))))
 
 (defun emux--message-alist (type symbol-list)
   `(list '("type" . ,type)
