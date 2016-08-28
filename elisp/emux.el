@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016 Maxim Velesyuk, Michael Austin and Raphael Sousa Santos
 
-;; Author: Maxim Velesyuk <email>, Michael Austin <email> and Raphael Sousa Santos <contact@raphaelss.com>
+;; Author: Maxim Velesyuk <email>, Michael Austin <mikey@mikeyaustin.com> and Raphael Sousa Santos <contact@raphaelss.com>
 ;; URL:
 ;; Package-Requires:
 ;; Version: 0.1
@@ -294,7 +294,7 @@
                              (tags (option (vector string)))))
 
 (emux--defmessage-type unmute ((id (option (vector string)))
-                             (tags (option (vector string)))))
+                               (tags (option (vector string)))))
 
 (emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string)))))
