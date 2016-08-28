@@ -194,11 +194,18 @@ sub proc_manager {
 
 sub register_process {
     my ($self, $process) = @_;
-    $self->{_proc_manager}->run_process($process);
-    $self->{_select}->add($process->fh);
-    $self->{_select}->add($process->errors);
-    $self->{_procs}->{$process->fh} = $process;
-    $self->{_proc_errors}->{$process->errors} = $process;
+    eval {
+        $self->{_proc_manager}->run_process($process);
+        $self->{_select}->add($process->fh);
+        $self->{_select}->add($process->errors);
+        $self->{_procs}->{$process->fh} = $process;
+        $self->{_proc_errors}->{$process->errors} = $process;
+        1;
+    } or do {
+        my $error = $@;
+        $self->{_logger}->err(
+            'could not start process %s; %s', $process->id, $error);
+    };
 }
 
 sub deregister_process {

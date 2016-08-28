@@ -28,8 +28,8 @@ sub new {
 sub run_process {
     my ($self, $process) = @_;
 
-    die sprintf 'process %s already exists', $process->id
-        if defined $self->{_procs}->{$process->id};
+    die sprintf "process %s already exists\n", $process->id
+        if $self->{_procs}->{id}->{$process->id};
 
     $self->_check_master($process);
     my ($pid, $fh, $errors) = $self->_fork(
