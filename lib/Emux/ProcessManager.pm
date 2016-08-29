@@ -13,7 +13,6 @@ sub new {
     my $self = {
         _config      => $args{config},
         _logger      => $args{logger},
-        _io          => $args{io},
         _master_opts => $args{master_opts} || '',
         _procs       => {},
         _masters     => {},
