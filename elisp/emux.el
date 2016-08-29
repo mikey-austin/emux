@@ -264,7 +264,13 @@
     (tags (vector string))))
 
 (emux--defresponse-type output ((id string) (content string))
-  (emux--write-to-emux-buffer id (base64-decode-string content)))
+  (let ((decoded (base64-decode-string content)))
+    (emux--broadcast id decoded)
+    (emux--write-to-emux-buffer id decoded)))
+
+(defun emux--broadcast (id data)
+  ;; just a hack for now
+  (emux--repl-handle-output id data))
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) ""))
