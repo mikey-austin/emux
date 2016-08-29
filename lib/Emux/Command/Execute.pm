@@ -17,11 +17,16 @@ sub execute {
     $self->{_host} = $message->{_body}->{machine} || 'localhost';
     $self->{_tags} = $message->{_body}->{tags} || [];
 
-    my $cmd;
+    my @options;
     if ($self->{_host} eq 'localhost') {
-        $cmd = $self->{_command};
+        push @options, $self->{_command};
     } else {
-        $cmd = "/usr/bin/ssh -qt $self->{_host} '$self->{_command}'";
+        push @options, '/usr/bin/ssh', '-qt';
+        if (my $control_path = $self->server->{_config}->get('control_path')) {
+            push @options, '-S', $control_path;
+        }
+        push @options, $self->{_host}, "'$self->{_command}'";
+        $self->server->{_logger}->debug('running %s', join ' ', @options);
     }
 
     my $process = Emux::Process->new(
@@ -29,7 +34,7 @@ sub execute {
         host    => $self->{_host},
         command => $self->{_command},
         tags    => $self->{_tags},
-        on_run  => sub { exec $cmd; },
+        on_run  => sub { exec join ' ', @options },
         on_exit => sub {
             my ($process, $exit_status) = @_;
             $self->server->deregister_process(

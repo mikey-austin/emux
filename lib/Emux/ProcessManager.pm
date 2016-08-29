@@ -150,15 +150,19 @@ sub _register_master {
     # Fork master ssh process.
     my $pid = $self->_fork(
         routine => sub {
-            my @options = ("-NTM", $self->{_master_opts}, $master);
+            my @options = (
+                '-NTM',
+                $self->{_master_opts},
+            );
             if (my $control_path = $self->{_config}->get('control_path')) {
-                push @options, "-o", "ControlPath $control_path";
+                push @options, '-S', $control_path;
             }
+            push @options, $master;
             $self->{_logger}->debug(
-                "starting master $master; %s %s",
+                "starting master; %s %s",
                 'ssh', join (' ', @options)
             );
-            exec "/usr/bin/ssh", @options;
+            exec join ' ', ('/usr/bin/ssh', @options);
         }
     );
 
