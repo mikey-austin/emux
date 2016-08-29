@@ -10,7 +10,7 @@ my $c = Emux::Config->new;
 
 # Test default values;
 ok($c->get('daemonize') == 0);
-ok(not defined $c->get('socket'));
+ok(defined $c->get('socket'));
 ok($c->get('pidfile') eq '/tmp/emux.pid');
 
 # Test merging.
@@ -26,5 +26,5 @@ ok($c->get('pidfile') eq '/tmp/emux.pid');
 # Test file loading.
 $c = Emux::Config->new('t/data/config1.conf');
 ok($c->get('daemonize') == 1);
-ok(not defined $c->get('socket'));
+ok(defined $c->get('socket'));
 ok($c->get('pidfile') eq '/tmp/pid3');
