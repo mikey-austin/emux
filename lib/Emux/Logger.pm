@@ -22,12 +22,12 @@ sub new {
 
     foreach my $level (qw/err warn info debug/) {
         no strict 'refs';
-        *{"$class::$level"} = sub {
+        *{"${class}::$level"} = sub {
             my $self = shift;
             my $format = shift;
             my $message = @_ > 0 ? sprintf($format, @_) : $format;
             return $self->log_message($message, $level);
-        } if not defined *{"$class::$level"}{CODE};
+        } if not defined *{"${class}::$level"}{CODE};
     }
 
     return $self;

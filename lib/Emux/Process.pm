@@ -22,11 +22,11 @@ sub new {
     # Set some getters/setters.
     foreach my $var (qw/id host fh pid errors created tags command/) {
         no strict 'refs';
-        *{"$class::$var"} = sub {
+        *{"${class}::$var"} = sub {
             my ($self, $arg) = @_;
             $self->{"_$var"} = $arg if defined $arg;
             return $self->{"_$var"};
-        } if not defined *{"$class::$var"}{CODE};
+        } if not defined *{"${class}::$var"}{CODE};
     }
 
     return $self;
