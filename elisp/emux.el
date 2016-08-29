@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016 Maxim Velesyuk, Michael Austin and Raphael Sousa Santos
 
-;; Author: Maxim Velesyuk <email>, Michael Austin <mikey@mikeyaustin.com> and Raphael Sousa Santos <contact@raphaelss.com>
+;; Author: Maxim Velesyuk <max.velesyuk@gmail.com>, Michael Austin <mikey@mikeyaustin.com> and Raphael Sousa Santos <contact@raphaelss.com>
 ;; URL:
 ;; Package-Requires:
 ;; Version: 0.1
