@@ -98,7 +98,7 @@ sub start {
                     $self->handle_proc_output(
                         TYPE_ERROR_OUTPUT, $process, $handle);
                 }
-                else {
+                elsif (defined $self->{_clients}->{$handle}) {
                     my ($message, $error);
                     eval {
                         # Check if the client disconnected.
@@ -120,6 +120,9 @@ sub start {
                         $self->disconnect($handle);
                     }
                 }
+                else {
+                    $self->{_logger}->err('unknown file handle %s', $handle);
+                }
             }
         }
     }
@@ -129,15 +132,10 @@ sub start {
 
 sub disconnect {
     my ($self, $handle) = @_;
-
-    # Make sure it is a client.
-    if (defined $self->{_clients}->{$handle}) {
-        $self->{_logger}->info('client disconnected');
-        $self->{_select}->remove($handle);
-        $handle->close
-            if $handle->can('close');
-        delete $self->{_clients}->{$handle};
-    }
+    $self->{_select}->remove($handle);
+    $handle->close
+        if $handle->can('close');
+    delete $self->{_clients}->{$handle};
 }
 
 sub register_listeners {
@@ -230,6 +228,7 @@ sub register_process {
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
     $self->{_select}->remove($process->fh);
+    $self->{_select}->remove($process->errors);
     delete $self->{_procs}->{$process->fh};
     delete $self->{_proc_errors}->{$process->errors};
     delete $self->{_muted}->{$process->id};
