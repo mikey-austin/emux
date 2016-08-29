@@ -120,9 +120,6 @@ sub start {
                         $self->disconnect($handle);
                     }
                 }
-                else {
-                    $self->{_logger}->err('unknown file handle %s', $handle);
-                }
             }
         }
     }
@@ -255,15 +252,15 @@ sub is_proc_error_fh {
 sub handle_proc_output {
     my ($self, $type, $process, $handle) = @_;
 
-    # Read output and broadcast output message in chunks.
+    $handle->blocking(0);
     my ($line, $output);
-    my $select = IO::Select->new($handle);
     do {
-        $line = readline($handle);
+        $line = $handle->getline;
         $output .= $line
             if $line;
-    } while ($line and $select->can_read(1));
-    return if not $output;
+    } while ($line);
+
+    return unless $output;
 
     unless ($self->{_muted}->{$process->id}) {
         my $message = Emux::Message->new($type);
