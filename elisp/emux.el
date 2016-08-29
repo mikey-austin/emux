@@ -25,6 +25,7 @@
 
 (defvar emux-path "emux")
 (defconst emux-log-buffer-name "*emux-logs*")
+(defconst emux--default-socket "/tmp/emux.sock")
 
 (defvar emux--process-name "emux")
 (defvar emux--response-type-table (make-hash-table :test 'equal))
@@ -296,7 +297,7 @@
                              (tags (option (vector string)))))
 
 (defun emux-start-client (&optional path)
-  (interactive (list (read-string "Socket: " (getenv "EMUX_SOCKET") nil nil t)))
+  (interactive (list (read-string "Socket: " (or (getenv "EMUX_SOCKET") emux--default-socket) nil nil t)))
   (when (emux-running?)
     (emux-finish-client))
   (if (and path
