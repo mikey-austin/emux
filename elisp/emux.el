@@ -219,18 +219,20 @@
                    initial-point-max)
             (set-window-point window (point-max))))))))
 
-(defun emux--write-to-emux-buffer (section content)
-  (let ((buffer (process-buffer (get-process emux--process-name))))
-    (emux--write-to-scrolling-buffer buffer
-                                     "\n=== " section " ===\n"
-                                     content)))
+(let ((last-section nil))
+  (defun emux--write-to-emux-buffer (section content &optional force-section)
+    (let ((buffer (process-buffer (get-process emux--process-name))))
+      (if (and (not force-section)
+               (string= section last-section))
+          (emux--write-to-scrolling-buffer buffer content)
+        (emux--write-to-scrolling-buffer buffer
+                                         "\n=== " section " ===\n"
+                                         content)
+        (setf last-section section)))))
 
 (defun emux--add-log (line)
   (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
                                    line "\n"))
-
-(defun emux--assoc-cdr (key alist)
-  (cdr (assoc key alist)))
 
 (defmacro emux--obj-with-keys (obj &rest key-type-pairs)
   `(and (listp ,obj)
@@ -273,7 +275,7 @@
   (emux--repl-handle-output id data))
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
-  (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) ""))
+  (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) "" t))
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))
