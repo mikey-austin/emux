@@ -323,8 +323,19 @@
   (delete-process emux--process-name))
 
 (defun emux-running? ()
+  (interactive)
   (and (process-live-p emux--process-name)
        t))
+
+(defun emux-erase-buffer ()
+  (interactive)
+  (with-current-buffer emux-buffer-name
+    (erase-buffer)))
+
+(defun emux-erase-log-buffer ()
+  (interactive)
+  (with-current-buffer emux-log-buffer-name
+    (erase-buffer)))
 
 (provide 'emux)
 ;;; emux.el ends here
