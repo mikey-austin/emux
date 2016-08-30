@@ -24,6 +24,7 @@
 (require 'subr-x)
 
 (defvar emux-path "emux")
+(defconst emux-buffer-name "*emux*")
 (defconst emux-log-buffer-name "*emux-logs*")
 (defconst emux--default-socket "/tmp/emux.sock")
 
@@ -272,7 +273,8 @@
 
 (defun emux--broadcast (id data)
   ;; just a hack for now
-  (emux--repl-handle-output id data))
+  (when (functionp 'emux--repl-handle-output)
+    (emux--repl-handle-output id data)))
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) "" t))
@@ -311,10 +313,10 @@
   (if (and path
            (not (string= "" (string-trim path))))
       (make-network-process :name emux--process-name
-                            :buffer "*emux*"
+                            :buffer emux-buffer-name
                             :filter #'emux--process-filter
                             :remote path)
-    (when (start-process emux--process-name "*emux*" emux-path)
+    (when (start-process emux--process-name emux-buffer-name emux-path)
       (set-process-filter (get-process emux--process-name)
                           #'emux--process-filter))))
 
