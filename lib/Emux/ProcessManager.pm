@@ -129,11 +129,6 @@ sub _deregister_process {
     delete $self->{_procs}->{id}->{$process->id};
     delete $self->{_procs}->{pid}->{$process->pid};
     delete $self->{_masters}->{$process->host}->{procs}->{$process->id};
-
-    # Deregister master if it has no more processes running.
-    my @master_procs = keys %{$self->{_masters}->{$process->host}->{procs}};
-    $self->_stop_master($process->host)
-        if @master_procs == 0;
 }
 
 sub _check_master {
