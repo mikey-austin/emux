@@ -262,7 +262,8 @@ sub _register_signals {
             }
             elsif ($self->{_masters_by_pid}->{$pid}) {
                 my $master = $self->{_masters_by_pid}->{$pid};
-                $self->{_logger}->warn('master %s exited with %i', $master, $exit_status);
+                $self->{_logger}->warn(
+                    'master %s pid %s exited with %i', @$master{qw(host pid)}, $exit_status);
                 eval {
                     $self->_deregister_master($master->{host});
                 } or do {
