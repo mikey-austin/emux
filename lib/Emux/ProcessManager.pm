@@ -221,6 +221,7 @@ sub _fork {
             close($parent_errors);
         }
         $SIG{'CHLD'} = 'IGNORE';
+        $SIG{'PIPE'} = 'IGNORE';
         $args{routine}->($child_handle, $child_errors);
         exit(0);
     }
