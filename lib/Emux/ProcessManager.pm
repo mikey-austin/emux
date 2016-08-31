@@ -125,7 +125,7 @@ sub _deregister_process {
         delete $self->{_tags}->{$tag}
             unless %{$self->{_tags}->{$tag}};
     }
-        ;
+
     delete $self->{_procs}->{id}->{$process->id};
     delete $self->{_procs}->{pid}->{$process->pid};
     delete $self->{_masters}->{$process->host}->{procs}->{$process->id};
@@ -262,6 +262,7 @@ sub _register_signals {
             }
             elsif ($self->{_masters_by_pid}->{$pid}) {
                 my $master = $self->{_masters_by_pid}->{$pid};
+                $self->{_logger}->warn('master %s exited with %i', $master, $exit_status);
                 eval {
                     $self->_deregister_master($master->{host});
                 } or do {
