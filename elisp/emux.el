@@ -236,7 +236,8 @@
         (save-excursion
           (goto-char (point-max))
           (let ((inhibit-read-only t))
-           (mapc #'insert strings)))
+            (mapc #'insert strings)
+            (ansi-color-apply-on-region initial-point-max (point-max))))
         (dolist (window (get-buffer-window-list buffer nil 0))
           (when (= (window-point window)
                    initial-point-max)
@@ -368,13 +369,15 @@
 
 (defun emux-erase-buffer ()
   (interactive)
-  (with-current-buffer (emux-buffer)
-    (erase-buffer)))
+  (let ((inhibit-read-only t))
+   (with-current-buffer (emux-buffer)
+     (erase-buffer))))
 
 (defun emux-erase-log-buffer ()
   (interactive)
-  (with-current-buffer (emux-log-buffer)
-    (erase-buffer)))
+  (let ((inhibit-read-only t))
+   (with-current-buffer (emux-log-buffer)
+     (erase-buffer))))
 
 (provide 'emux)
 ;;; emux.el ends here
