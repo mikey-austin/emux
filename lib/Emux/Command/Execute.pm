@@ -25,16 +25,20 @@ sub execute {
         if (my $control_path = $self->server->{_config}->get('control_path')) {
             push @options, '-S', $control_path;
         }
-        push @options, $self->{_host}, "'$self->{_command}'";
-        $self->server->{_logger}->debug('running %s', join ' ', @options);
+        my $command = $self->{_command};
+        $command =~ s/'/'\\''/g;
+        push @options, $self->{_host}, "'$command'";
     }
+
+    my $full_command = join ' ', @options;
+    $self->server->{_logger}->debug('running %s', $full_command);
 
     my $process = Emux::Process->new(
         id      => $self->{_id},
         host    => $self->{_host},
         command => $self->{_command},
         tags    => $self->{_tags},
-        on_run  => sub { exec join ' ', @options },
+        on_run  => sub { exec $full_command },
         on_exit => sub {
             my ($process, $exit_status) = @_;
             $self->server->deregister_process(
