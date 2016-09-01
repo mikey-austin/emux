@@ -34,15 +34,19 @@ sub create_process {
         if (my $control_path = $self->server->{_config}->get('control_path')) {
             push @options, '-S', $control_path;
         }
-        push @options, $args->{machine}, "'$args->{command}'";
+
+        my $command = $args->{command};
+        $command =~ s/'/'\\''/g;
+        push @options, $args->{machine}, "'$command'";
     }
 
+    my $full_command = join ' ', @options;
     my $process = Emux::Process->new(
         id      => $args->{id},
         host    => $args->{host},
         command => $args->{command},
         tags    => $args->{tags},
-        on_run  => sub { exec join ' ', @options },
+        on_run  => sub { exec $full_command },
         on_exit => sub {
             my ($process, $exit_status) = @_;
             $self->server->deregister_process(

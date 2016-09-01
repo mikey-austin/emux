@@ -24,8 +24,6 @@
 (require 'subr-x)
 
 (defvar emux-path "emux")
-(defconst emux-buffer-name "*emux*")
-(defconst emux-log-buffer-name "*emux-logs*")
 (defconst emux--default-socket "/tmp/emux.sock")
 
 (defvar emux--process-name "emux")
@@ -84,6 +82,29 @@
             (:ok (push val result))
             (:error (return-from func-body f-x)))))
       (emux--result-ok (nreverse result)))))
+
+(defvar emux-buffer-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map special-mode-map)
+    (define-key map "g" nil) ; nothing to revert
+    map))
+
+(define-derived-mode emux-buffer-mode special-mode "Emux"
+  "Major mode used in the \"*emux*\" and \"*emux-log*\" buffers.")
+
+(defun emux-buffer ()
+  (let ((name "*emux*"))
+    (or (get-buffer name)
+        (with-current-buffer (get-buffer-create name)
+          (emux-buffer-mode)
+          (current-buffer)))))
+
+(defun emux-log-buffer ()
+  (let ((name "*emux-log*"))
+    (or (get-buffer name)
+        (with-current-buffer (get-buffer-create name)
+          (emux-buffer-mode)
+          (current-buffer)))))
 
 (defun emux--spec-wrap-predicate (spec-s pred)
   (lambda (x)
@@ -214,7 +235,9 @@
       (let ((initial-point-max (point-max)))
         (save-excursion
           (goto-char (point-max))
-          (mapc #'insert strings))
+          (let ((inhibit-read-only t))
+            (mapc #'insert strings)
+            (ansi-color-apply-on-region initial-point-max (point-max))))
         (dolist (window (get-buffer-window-list buffer nil 0))
           (when (= (window-point window)
                    initial-point-max)
@@ -222,18 +245,33 @@
 
 (let ((last-section nil))
   (defun emux--write-to-emux-buffer (section content &optional force-section)
-    (let ((buffer (process-buffer (get-process emux--process-name))))
-      (if (and (not force-section)
-               (string= section last-section))
-          (emux--write-to-scrolling-buffer buffer content)
-        (emux--write-to-scrolling-buffer buffer
-                                         "\n=== " section " ===\n"
-                                         content)
-        (setf last-section section)))))
+    (if (and (not force-section)
+             (string= section last-section))
+        (emux--write-to-scrolling-buffer (emux-buffer) content)
+      (emux--write-to-scrolling-buffer (emux-buffer)
+                                       "\n=== " section " ===\n"
+                                       content)
+      (setf last-section section))))
 
-(defun emux--add-log (line)
-  (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
-                                   line "\n"))
+(let (last-line last-line-count)
+  (defun emux--add-log (line)
+    (if (and last-line (string= line last-line))
+        (with-current-buffer (emux-log-buffer)
+          (let ((move-back-to (and (/= (point) (point-max))
+                                   (point))))
+            (save-excursion
+              (goto-char (- (point-max) 1))
+              (let ((inhibit-read-only t))
+                (delete-region (line-beginning-position) (point-max))))
+            (incf last-line-count)
+            (emux--write-to-scrolling-buffer (current-buffer)
+                                             line " [" (int-to-string last-line-count) " times]\n")
+            (when move-back-to
+              (goto-char move-back-to))))
+      (setq last-line line
+            last-line-count 1)
+      (emux--write-to-scrolling-buffer (emux-log-buffer)
+                                       line "\n"))))
 
 (defmacro emux--obj-with-keys (obj &rest key-type-pairs)
   `(and (listp ,obj)
@@ -275,19 +313,21 @@
 
 (emux--defresponse-type output ((id string) (content string))
   (let ((decoded (base64-decode-string content)))
-    (emux--broadcast id decoded)
+    (emux--broadcast 'output id decoded)
     (emux--write-to-emux-buffer id decoded)))
 
-(defun emux--broadcast (id data)
+(defun emux--broadcast (kind id data)
   ;; just a hack for now
   (when (functionp 'emux--repl-handle-output)
-    (emux--repl-handle-output id data)))
+    (emux--repl-handle-output kind id data)))
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
+  (emux--broadcast 'finished id exit_code)
   (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) "" t))
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
   (let ((content (base64-decode-string content)))
+    (emux--broadcast 'error id content)
     (if (null id)
         (emux--add-log content)
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
@@ -322,10 +362,10 @@
   (if (and path
            (not (string= "" (string-trim path))))
       (make-network-process :name emux--process-name
-                            :buffer emux-buffer-name
+                            :buffer (emux-buffer)
                             :filter #'emux--process-filter
                             :remote path)
-    (when (start-process emux--process-name emux-buffer-name emux-path)
+    (when (start-process emux--process-name (emux-buffer) emux-path)
       (set-process-filter (get-process emux--process-name)
                           #'emux--process-filter))))
 
@@ -340,13 +380,15 @@
 
 (defun emux-erase-buffer ()
   (interactive)
-  (with-current-buffer emux-buffer-name
-    (erase-buffer)))
+  (let ((inhibit-read-only t))
+   (with-current-buffer (emux-buffer)
+     (erase-buffer))))
 
 (defun emux-erase-log-buffer ()
   (interactive)
-  (with-current-buffer emux-log-buffer-name
-    (erase-buffer)))
+  (let ((inhibit-read-only t))
+   (with-current-buffer (emux-log-buffer)
+     (erase-buffer))))
 
 (provide 'emux)
 ;;; emux.el ends here
