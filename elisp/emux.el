@@ -231,9 +231,24 @@
                                          content)
         (setf last-section section)))))
 
-(defun emux--add-log (line)
-  (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
-                                   line "\n"))
+(let (last-line last-line-count)
+  (defun emux--add-log (line)
+    (if (and last-line (string= line emux--log-last-line))
+        (with-current-buffer (get-buffer-create emux-log-buffer-name)
+          (let ((move-back-to (and (/= (point) (point-max))
+                                   (point))))
+            (save-excursion
+              (goto-char (- (point-max) 1))
+              (delete-region (line-beginning-position) (point-max)))
+            (incf last-line-count)
+            (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
+                                             line " [" (int-to-string last-line-count) " times]\n")
+            (when move-back-to
+              (goto-char move-back-to))))
+      (setq last-line line
+            last-line-count 1)
+      (emux--write-to-scrolling-buffer (get-buffer-create emux-log-buffer-name)
+                                       line "\n"))))
 
 (defmacro emux--obj-with-keys (obj &rest key-type-pairs)
   `(and (listp ,obj)
