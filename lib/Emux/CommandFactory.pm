@@ -21,6 +21,9 @@ sub create {
     if ($type eq TYPE_EXECUTE) {
         $class = 'Execute';
     }
+    elsif ($type eq TYPE_PIPELINE) {
+        $class = 'Pipeline';
+    }
     elsif ($type eq TYPE_STATE) {
         $class = 'State';
     }

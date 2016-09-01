@@ -266,6 +266,13 @@
     (id string)
     (tags (vector string))))
 
+(emux--defspec pipeline-command () data
+  (emux--obj-with-keys data
+    (id string)
+    (command string)
+    (machine (option string))
+    (tags (option (vector string)))))
+
 (emux--defresponse-type output ((id string) (content string))
   (let ((decoded (base64-decode-string content)))
     (emux--broadcast id decoded)
@@ -294,6 +301,8 @@
                                 (command string)
                                 (machine (option string))
                                 (tags (option (vector string)))))
+
+(emux--defmessage-type pipeline ((pipeline (vector pipeline-command))))
 
 (emux--defmessage-type state ())
 

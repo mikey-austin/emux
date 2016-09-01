@@ -10,30 +10,38 @@ sub execute {
     my $self = shift;
 
     my $message = $self->message;
-    $self->{_command} = $message->{_body}->{command}
+    my %args = map { $_ => $message->{_body}->{$_ } }
+        qw(id machine command tags);
+    my $process = $self->create_process(\%args);
+    $self->server->register_process($process);
+}
+
+sub create_process {
+    my ($self, $args) = @_;
+
+    $args->{command}
         or die 'command required';
-    $self->{_id} = $message->{_body}->{id}
+    $args->{id}
         or die 'id required';
-    $self->{_host} = $message->{_body}->{machine} || 'localhost';
-    $self->{_tags} = $message->{_body}->{tags} || [];
+    $args->{machine} ||= 'localhost';
+    $args->{tags}    ||= [];
 
     my @options;
-    if ($self->{_host} eq 'localhost') {
-        push @options, $self->{_command};
+    if ($args->{command} eq 'localhost') {
+        push @options, $args->{command};
     } else {
         push @options, '/usr/bin/ssh', '-qt';
         if (my $control_path = $self->server->{_config}->get('control_path')) {
             push @options, '-S', $control_path;
         }
-        push @options, $self->{_host}, "'$self->{_command}'";
-        $self->server->{_logger}->debug('running %s', join ' ', @options);
+        push @options, $args->{machine}, "'$args->{command}'";
     }
 
     my $process = Emux::Process->new(
-        id      => $self->{_id},
-        host    => $self->{_host},
-        command => $self->{_command},
-        tags    => $self->{_tags},
+        id      => $args->{id},
+        host    => $args->{host},
+        command => $args->{command},
+        tags    => $args->{tags},
         on_run  => sub { exec join ' ', @options },
         on_exit => sub {
             my ($process, $exit_status) = @_;
@@ -42,7 +50,7 @@ sub execute {
         }
     );
 
-    $self->server->register_process($process);
+    return $process;
 }
 
 1;
