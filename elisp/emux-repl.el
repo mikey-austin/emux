@@ -1,7 +1,11 @@
+(require 'subr-x)
+
 (defvar emux--repl-input)
 (defconst emux--repl-buffer-name "*emux-repl*")
 (defconst emux--repl-header "*** Welcome to EMUX ***  Type ? for help.\n")
-(defconst emux--repl-prompt "EMUX> ")
+(defvar emux--repl-machine "localhost")
+(defconst emux--repl-prompt-format "EMUX@%s > ")
+(defvar emux--repl-prompt  (format emux--repl-prompt-format emux--repl-machine))
 
 (defvar emux--repl-map
   (let ((map (make-sparse-keymap)))
@@ -31,25 +35,37 @@
     (emux--repl-eval-input emux--repl-input)))
 
 (defun emux--repl-handle-output (id data)
-  (comint-output-filter (emux--repl-process) (concat data "\n" emux--repl-prompt)))
+  (emux--repl-print data))
 
 (defvar emux--repl-request-id 0)
 (defun emux--repl-next-id ()
   (format "%s" (incf emux--repl-request-id)))
 
 (defun emux--repl-show-help (input)
-  (concat "help not implemented yet" "\n" emux--repl-prompt))
+  (cond
+   ((string= input "?") ":m machine ; sets current machine")
+   (t "; detailed help is not here yet")))
 
 (defun emux--repl-command (input)
-  (concat "special commands not implemented yet" "\n" emux--repl-prompt))
+  (cond
+   ((string-match-p ":m .+" input)
+    (emux-change-machine (second (split-string input)))
+    (concat "; machine set to " emux--repl-machine))
+   (t "; special commands not implemented yet")))
+
+(defun emux-change-machine (machine)
+  (interactive)
+  (setq emux--repl-machine machine)
+  (setq emux--repl-prompt (format emux--repl-prompt-format emux--repl-machine)))
+
+(defun emux--repl-print (text)
+  (comint-output-filter (emux--repl-process) (concat text "\n" emux--repl-prompt)))
 
 (defun emux--repl-eval-input (input)
-  (comint-output-filter
-   (emux--repl-process)
-   (cond
-    ((string-prefix-p "?" input) emux--repl-show-help)
-    ((string-prefix-p ":" input) emux--repl-command)
-    (t (emux-execute :command input :id (emux--repl-next-id) :machine "off")))))
+  (cond
+   ((string-prefix-p "?" input) (emux--repl-print (emux--repl-show-help input)))
+   ((string-prefix-p ":" input) (emux--repl-print (emux--repl-command input)))
+   (t (emux-execute :command input :id (emux--repl-next-id) :machine emux--repl-machine))))
 
 (defun emux--repl-return ()
   (interactive)
