@@ -22,6 +22,7 @@
 
 (require 'json)
 (require 'subr-x)
+(require 'tabulated-list)
 
 (defvar emux-path "emux")
 (defconst emux--default-socket "/tmp/emux.sock")
@@ -87,20 +88,31 @@
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map special-mode-map)
     (define-key map "g" nil) ; nothing to revert
+    (define-key map "s" 'emux-state)
     map))
 
 (define-derived-mode emux-buffer-mode special-mode "Emux"
   "Major mode used in the \"*emux*\" and \"*emux-log*\" buffers.")
 
-(defun emux-buffer ()
-  (let ((name "*emux*"))
+(define-derived-mode emux-state-mode tabulated-list-mode "Emux state"
+  "Major mode for Emus state")
+
+(let ((name "*emux-state"))
+  (defun emux-state-buffer ()
+    (or (get-buffer name)
+        (with-current-buffer (get-buffer-create name)
+          (emux-state-mode)
+          (current-buffer)))))
+
+(let ((name "*emux*"))
+  (defun emux-buffer ()
     (or (get-buffer name)
         (with-current-buffer (get-buffer-create name)
           (emux-buffer-mode)
           (current-buffer)))))
 
-(defun emux-log-buffer ()
-  (let ((name "*emux-log*"))
+(let ((name "*emux-log*"))
+  (defun emux-log-buffer ()
     (or (get-buffer name)
         (with-current-buffer (get-buffer-create name)
           (emux-buffer-mode)
@@ -216,11 +228,14 @@
         (specs (cl-gensym))
         (specs-val (cl-gensym))
         (val (cl-gensym))
-        (type-as-string (symbol-name name)))
+        (type-as-string (symbol-name name))
+        (interactive-form (when (eq (caar body) 'interactive)
+                            (list (pop body)))))
     `(let ((,specs (mapcar (lambda (as)
                              (emux--getspec-func as))
                            ',spec-sexps)))
        (cl-defun ,(emux--prefix-symbol "emux-" name) ,(cons '&key arg-names)
+         ,@interactive-form
          (emux--result-match (,val (emux--result-seq-fzip ,specs
                                                           (list ,@arg-names)))
            (:ok (emux--send-message ,(emux--message-alist type-as-string
@@ -282,6 +297,33 @@
                                 (cdr (assoc ,key ,obj)))))
                   key-type-pairs)))
 
+(let ((format-entry
+       (lambda (p)
+         (list p
+               (vector
+                " "
+                " "
+                (cdr (assoc "id" p))
+                (cdr (assoc "machine" p))
+                (format-time-string "%Y-%m-%d-%H-%M-%S"
+                                    (seconds-to-time (cdr (assoc "created" p))))
+                (cdr (assoc "command" p))
+                (string-join (cdr (assoc "tags" p)) ","))))))
+  (defun emux--refresh-state-buffer (processes)
+    (with-current-buffer (emux-state-buffer)
+      (setq tabulated-list-format (vector
+                                   '(" " 1 t :pad-right 0)
+                                   '("M" 1 t)
+                                   '("Id" 16 t)
+                                   '("Machine" 12 t)
+                                   '("Created" 20 t)
+                                   '("Command" 24 t)
+                                   '("Tags" 30 nil))
+            tabulated-list-use-header-line t
+            tabulated-list-entries (map 'list format-entry processes))
+      (tabulated-list-init-header)
+      (tabulated-list-print))))
+
 (emux--defspec string () data
   (stringp data))
 
@@ -335,7 +377,7 @@
 (emux--defresponse-type state ((tags (vector string))
                                (muted (vector string))
                                (processes (vector process)))
-  (emux--write-to-emux-buffer "state" (format "%S\n" processes)))
+  (emux--refresh-state-buffer processes))
 
 (emux--defmessage-type execute ((id string)
                                 (command string)
@@ -344,7 +386,9 @@
 
 (emux--defmessage-type pipeline ((pipeline (vector pipeline-command))))
 
-(emux--defmessage-type state ())
+(emux--defmessage-type state ()
+  (interactive)
+  (switch-to-buffer (emux-state-buffer)))
 
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string)))))
