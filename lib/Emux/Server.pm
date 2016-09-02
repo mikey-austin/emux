@@ -73,7 +73,7 @@ sub start {
 
     for (;;) {
         while (my @ready = $self->{_select}->can_read) {
-            foreach my $handle (@ready) {
+            foreach my $handle (grep defined $_, @ready) {
                 if ($self->is_listener($handle)) {
                     my $client = $handle->accept;
                     my $from;
@@ -181,7 +181,7 @@ sub register_listeners {
 
 sub is_listener {
     my ($self, $fh) = @_;
-    any { $_ == $fh } @{$self->{_listeners}};
+    any { $fh and $_ == $fh } @{$self->{_listeners}};
 }
 
 sub proc_manager {
@@ -202,8 +202,10 @@ sub unmute_ids {
     }
 }
 
-sub muted {
-    keys %{shift->{_muted}};
+sub is_process_muted {
+    my ($self, $process) = @_;
+    return exists $self->{_muted}->{$process->id}
+        ? 1 : 0;
 }
 
 sub register_process {
@@ -241,12 +243,12 @@ sub deregister_process {
 
 sub is_proc_fh {
     my ($self, $fh) = @_;
-    return defined $self->{_procs}->{$fh};
+    return $fh && $self->{_procs}->{$fh};
 }
 
 sub is_proc_error_fh {
     my ($self, $fh) = @_;
-    return defined $self->{_proc_errors}->{$fh};
+    return $fh && $self->{_proc_errors}->{$fh};
 }
 
 sub handle_proc_output {

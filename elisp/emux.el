@@ -352,6 +352,7 @@
     (command string)
     (machine (option string))
     (id string)
+    (muted integer)
     (tags (vector string))))
 
 (emux--defspec pipeline-command () data
@@ -383,7 +384,6 @@
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
 
 (emux--defresponse-type state ((tags (vector string))
-                               (muted (vector string))
                                (processes (vector process)))
   (emux--refresh-state-buffer processes))
 

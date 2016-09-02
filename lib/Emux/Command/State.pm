@@ -14,11 +14,11 @@ sub execute {
     my $message = Emux::Message->new(TYPE_STATE);
     $message->body({
         tags  => [ $proc_manager->running_tags ],
-        muted => [ $server->muted ],
         processes => [
             map {
                 id      => $_->id,
                 machine => $_->host,
+                muted   => $server->is_process_muted($_),
                 command => $_->command,
                 created => int $_->created,
                 tags    => $_->tags,
