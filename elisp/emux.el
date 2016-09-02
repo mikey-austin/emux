@@ -358,7 +358,7 @@
     (command string)
     (machine (option string))
     (id string)
-    (muted integer)
+    (muted boolean)
     (tags (vector string))))
 
 (emux--defspec pipeline-command () data
