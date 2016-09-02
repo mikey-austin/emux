@@ -261,7 +261,7 @@ sub handle_proc_output {
             if $line;
     } while ($line);
 
-    return unless $output;
+    return unless $process and $output;
 
     unless ($self->{_muted}->{$process->id}) {
         my $message = Emux::Message->new($type);
