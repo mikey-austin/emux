@@ -94,8 +94,14 @@
 (define-derived-mode emux-buffer-mode special-mode "Emux"
   "Major mode used in the \"*emux*\" and \"*emux-log*\" buffers.")
 
+(defvar emux-state-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map tabulated-list-mode-map)
+    (define-key map "r" 'emux-state)
+    map))
+
 (define-derived-mode emux-state-mode tabulated-list-mode "Emux state"
-  "Major mode for Emus state")
+  "Major mode for \"*emux-state*\" buffer")
 
 (let ((name "*emux-state"))
   (defun emux-state-buffer ()
@@ -302,7 +308,9 @@
          (list p
                (vector
                 " "
-                " "
+                (if (cdr (assoc "muted" p))
+                    "*"
+                  " ")
                 (cdr (assoc "id" p))
                 (cdr (assoc "machine" p))
                 (format-time-string "%Y-%m-%d-%H-%M-%S"
