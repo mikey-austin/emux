@@ -18,7 +18,7 @@ sub execute {
             map {
                 id      => $_->id,
                 machine => $_->host,
-                muted   => $server->is_process_muted($_),
+                muted   => $server->is_muted($_) ? JSON::true : JSON::false,
                 command => $_->command,
                 created => int $_->created,
                 tags    => $_->tags,
