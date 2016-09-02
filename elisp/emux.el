@@ -103,7 +103,7 @@
 (define-derived-mode emux-state-mode tabulated-list-mode "Emux state"
   "Major mode for \"*emux-state*\" buffer")
 
-(let ((name "*emux-state"))
+(let ((name "*emux-state*"))
   (defun emux-state-buffer ()
     (or (get-buffer name)
         (with-current-buffer (get-buffer-create name)
@@ -186,6 +186,7 @@
 (defun emux--json-decode (json-str)
   (let* ((json-array-type 'vector)
          (json-key-type 'string)
+         (json-false nil)
          (json-object-type 'alist))
     (condition-case err
         (let ((obj (json-read-from-string json-str)))
@@ -302,6 +303,7 @@
                       `(funcall ,(emux--getspec-sexp type)
                                 (cdr (assoc ,key ,obj)))))
                   key-type-pairs)))
+(put 'emux--obj-with-keys 'lisp-indent-function 1)
 
 (let ((format-entry
        (lambda (p)
@@ -332,6 +334,9 @@
       (tabulated-list-init-header)
       (tabulated-list-print))))
 
+(emux--defspec boolean () data
+  (booleanp data))
+
 (emux--defspec string () data
   (stringp data))
 
@@ -349,6 +354,7 @@
 (emux--defspec process () data
   (emux--obj-with-keys data
     (created integer)
+    (muted boolean)
     (command string)
     (machine (option string))
     (id string)
@@ -383,7 +389,6 @@
       (emux--write-to-emux-buffer (concat id " (stderr)") content))))
 
 (emux--defresponse-type state ((tags (vector string))
-                               (muted (vector string))
                                (processes (vector process)))
   (emux--refresh-state-buffer processes))
 

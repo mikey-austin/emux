@@ -202,8 +202,9 @@ sub unmute_ids {
     }
 }
 
-sub muted {
-    keys %{shift->{_muted}};
+sub is_muted {
+    my ($self, $proc) = @_;
+    return exists $self->{_muted}->{$proc->id};
 }
 
 sub register_process {
