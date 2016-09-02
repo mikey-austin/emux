@@ -27,7 +27,7 @@ sub create_process {
     $args->{tags}    ||= [];
 
     my @options;
-    if ($args->{command} eq 'localhost') {
+    if ($args->{machine} eq 'localhost') {
         push @options, $args->{command};
     } else {
         push @options, '/usr/bin/ssh', '-qt';
@@ -43,7 +43,7 @@ sub create_process {
     my $full_command = join ' ', @options;
     my $process = Emux::Process->new(
         id      => $args->{id},
-        host    => $args->{host},
+        host    => $args->{machine},
         command => $args->{command},
         tags    => $args->{tags},
         on_run  => sub { exec $full_command },
