@@ -252,20 +252,29 @@
 (put 'emux--defmessage-type 'lisp-indent-function 2)
 
 (defun emux--write-to-scrolling-buffer (buffer &rest strings)
-  (when (buffer-live-p buffer)
-    (with-current-buffer buffer
-      (let ((initial-point-max (point-max)))
-        (save-excursion
-          (goto-char (point-max))
-          (let ((inhibit-read-only t))
-            (mapc #'insert strings)
-            (ansi-color-apply-on-region initial-point-max (point-max))))
-        (dolist (window (get-buffer-window-list buffer nil 0))
-          (when (= (window-point window)
-                   initial-point-max)
-            (set-window-point window (point-max))))))))
+  (with-current-buffer buffer
+    (let ((initial-point (point))
+          (initial-point-max (point-max)))
+      (save-excursion
+        (goto-char (point-max))
+        (let ((inhibit-read-only t))
+          (mapc #'insert strings)
+          (ansi-color-apply-on-region initial-point-max (point-max))))
+      (when (= initial-point initial-point-max)
+        (goto-char (point-max)))
+      (dolist (window (get-buffer-window-list buffer nil t))
+        (when (= (window-point window)
+                 initial-point-max)
+          (set-window-point window (point-max)))))))
 
-(let ((last-section nil))
+(let (last-section)
+  (defun emux-erase-buffer ()
+    (interactive)
+    (setq last-section nil)
+    (let ((inhibit-read-only t))
+      (with-current-buffer (emux-buffer)
+        (erase-buffer))))
+
   (defun emux--write-to-emux-buffer (section content &optional force-section)
     (if (and (not force-section)
              (string= section last-section))
@@ -275,25 +284,26 @@
                                        content)
       (setf last-section section))))
 
-(let (last-line last-line-count)
-  (defun emux--add-log (line)
-    (if (and last-line (string= line last-line))
+(let (previous repeated-count)
+  (defun emux--add-log (content)
+    (if (and previous (string= content previous))
         (with-current-buffer (emux-log-buffer)
-          (let ((move-back-to (and (/= (point) (point-max))
-                                   (point))))
-            (save-excursion
-              (goto-char (- (point-max) 1))
-              (let ((inhibit-read-only t))
-                (delete-region (line-beginning-position) (point-max))))
-            (incf last-line-count)
+          (let* ((delete-from (- (point-max)
+                                 (length previous)
+                                 (if (= repeated-count 1)
+                                     1
+                                   (+ (floor (log10 repeated-count))
+                                      11))))
+                 (delete-to (point-max)))
+            (incf repeated-count)
             (emux--write-to-scrolling-buffer (current-buffer)
-                                             line " [" (int-to-string last-line-count) " times]\n")
-            (when move-back-to
-              (goto-char move-back-to))))
-      (setq last-line line
-            last-line-count 1)
+                                             content " [" (int-to-string repeated-count) " times]\n")
+            (let ((inhibit-read-only t))
+              (delete-region delete-from delete-to))))
+      (setq previous content
+            repeated-count 1)
       (emux--write-to-scrolling-buffer (emux-log-buffer)
-                                       line "\n"))))
+                                       content "\n"))))
 
 (defmacro emux--obj-with-keys (obj &rest key-type-pairs)
   `(and (listp ,obj)
@@ -435,12 +445,6 @@
   (interactive)
   (and (process-live-p emux--process-name)
        t))
-
-(defun emux-erase-buffer ()
-  (interactive)
-  (let ((inhibit-read-only t))
-   (with-current-buffer (emux-buffer)
-     (erase-buffer))))
 
 (defun emux-erase-log-buffer ()
   (interactive)
