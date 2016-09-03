@@ -88,7 +88,7 @@
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map special-mode-map)
     (define-key map "g" nil) ; nothing to revert
-    (define-key map "s" 'emux-state)
+    (define-key map "s" 'emux-switch-to-state)
     map))
 
 (define-derived-mode emux-buffer-mode special-mode "Emux"
@@ -97,11 +97,70 @@
 (defvar emux-state-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
-    (define-key map "g" 'emux-state)
+    (define-key map "d" 'emux-state-buffer-stop)
+    (define-key map "m" 'emux-state-buffer-mute)
+    (define-key map "u" 'emux-state-buffer-unmute)
+    (define-key map "x" 'emux-state-buffer-execute)
+    (define-key map "c" 'emux-state-buffer-clear-op)
     map))
 
 (define-derived-mode emux-state-mode tabulated-list-mode "Emux state"
-  "Major mode for \"*emux-state*\" buffer")
+  "Major mode for \"*emux-state*\" buffer"
+  (add-hook 'tabulated-list-revert-hook 'emux-state))
+
+(defun emux-state-buffer-stop ()
+  (interactive)
+  (when (tabulated-list-get-entry)
+   (tabulated-list-set-col 0 "D" t)
+   (forward-line 1)))
+
+(defun emux-state-buffer-mute ()
+  (interactive)
+  (when (tabulated-list-get-entry)
+    (tabulated-list-set-col 0 "M" t)
+    (forward-line 1)))
+
+(defun emux-state-buffer-unmute ()
+  (interactive)
+  (when (tabulated-list-get-entry)
+    (tabulated-list-set-col 0 "U" t)
+    (forward-line 1)))
+
+(defun emux-state-buffer-clear-op ()
+  (interactive)
+  (when (tabulated-list-get-entry)
+    (tabulated-list-set-col 0 " " t)
+    (forward-line 1)))
+
+(defun emux-state-buffer-execute ()
+  (interactive)
+  (let (to-stop to-mute to-unmute)
+    (with-current-buffer (emux-state-buffer)
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (let ((entry (tabulated-list-get-entry)))
+            (unless (null entry)
+              (let ((op (aref entry 0))
+                    (id (aref entry 2)))
+                (cond ((string= op "D")
+                       (tabulated-list-delete-entry)
+                       (push id to-stop))
+                      ((string= op "M")
+                       (tabulated-list-set-col 1 "*")
+                       (push id to-mute))
+                      ((string= op "U")
+                       (tabulated-list-set-col 1 " ")
+                       (push id to-unmute))))
+              (tabulated-list-set-col 0 " "))
+            (forward-line 1)))))
+    (when to-stop
+      (emux-stop :id (apply 'vector to-stop)))
+    (when to-mute
+      (emux-mute :id (apply 'vector to-mute)))
+    (when to-unmute
+      (emux-unmute :id (apply 'vector to-unmute)))
+    (run-at-time 0.1 nil 'emux-state)))
 
 (let ((name "*emux-state*"))
   (defun emux-state-buffer ()
@@ -317,19 +376,20 @@
 
 (let ((format-entry
        (lambda (p)
-         (list p
-               (vector
-                " "
-                (if (cdr (assoc "muted" p))
-                    "*"
-                  " ")
-                (cdr (assoc "id" p))
-                (cdr (assoc "machine" p))
-                (format-time-string "%Y-%m-%d-%H-%M-%S"
-                                    (seconds-to-time (cdr (assoc "created" p))))
-                (cdr (assoc "command" p))
-                (string-join (cdr (assoc "tags" p)) ","))))))
-  (defun emux--refresh-state-buffer (processes)
+         (let ((id (cdr (assoc "id" p))))
+           (list id
+                 (vector
+                  " "
+                  (if (cdr (assoc "muted" p))
+                      "*"
+                    " ")
+                  (cdr (assoc "id" p))
+                  (cdr (assoc "machine" p))
+                  (format-time-string "%Y-%m-%d-%H-%M-%S"
+                                      (seconds-to-time (cdr (assoc "created" p))))
+                  (cdr (assoc "command" p))
+                  (string-join (cdr (assoc "tags" p)) ",")))))))
+  (defun emux--write-state-buffer (processes)
     (with-current-buffer (emux-state-buffer)
       (setq tabulated-list-format (vector
                                    '(" " 1 t :pad-right 0)
@@ -342,7 +402,7 @@
             tabulated-list-use-header-line t
             tabulated-list-entries (map 'list format-entry processes))
       (tabulated-list-init-header)
-      (tabulated-list-print))))
+      (tabulated-list-print t))))
 
 (emux--defspec boolean () data
   (booleanp data))
@@ -401,7 +461,7 @@
 
 (emux--defresponse-type state ((tags (vector string))
                                (processes (vector process)))
-  (emux--refresh-state-buffer processes))
+  (emux--write-state-buffer processes))
 
 (emux--defmessage-type execute ((id string)
                                 (command string)
@@ -410,9 +470,7 @@
 
 (emux--defmessage-type pipeline ((pipeline (vector pipeline-command))))
 
-(emux--defmessage-type state ()
-  (interactive)
-  (switch-to-buffer (emux-state-buffer)))
+(emux--defmessage-type state ())
 
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string)))))
@@ -422,6 +480,11 @@
 
 (emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string)))))
+
+(defun emux-switch-to-state ()
+  (interactive)
+  (emux-state)
+  (switch-to-buffer (emux-state-buffer)))
 
 (defun emux-start-client (&optional path)
   (interactive (list (read-string "Socket: " (or (getenv "EMUX_SOCKET") emux--default-socket) nil nil t)))
