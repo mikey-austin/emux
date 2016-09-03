@@ -97,7 +97,7 @@
 (defvar emux-state-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
-    (define-key map "r" 'emux-state)
+    (define-key map "g" 'emux-state)
     map))
 
 (define-derived-mode emux-state-mode tabulated-list-mode "Emux state"
