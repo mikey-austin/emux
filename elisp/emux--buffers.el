@@ -25,6 +25,8 @@
 
 (defvar emux--running-processes (make-hash-table :test 'equal))
 (defvar emux--inhibit-state-updates nil)
+(defvar emux-buffer-section-face font-lock-comment-face)
+(defvar emux-buffer-content-face nil)
 
 (defun emux--set-header-line (line)
   (with-current-buffer (emux-buffer)
@@ -97,7 +99,7 @@
         (cancel-timer scheduled-message))
       (setq scheduled-message (run-at-time 0.2 nil 'emux-state)))))
 
-(defun emux--write-to-scrolling-buffer (buffer &rest strings)
+(defun emux--write-to-scrolling-buffer (buffer properties &rest strings)
   (with-current-buffer buffer
     (let ((initial-point (point))
           (initial-point-max (point-max)))
@@ -105,6 +107,8 @@
         (goto-char (point-max))
         (let ((inhibit-read-only t))
           (mapc #'insert strings)
+          (when properties
+            (set-text-properties initial-point-max (point-max) properties))
           (ansi-color-apply-on-region initial-point-max (point-max))))
       (when (= initial-point initial-point-max)
         (goto-char (point-max)))
@@ -119,7 +123,7 @@
    (with-current-buffer (emux-log-buffer)
      (erase-buffer))))
 
-(let (last-section)
+(let (last-section content-properties section-properties)
   (defun emux-erase-buffer ()
     (interactive)
     (setq last-section nil)
@@ -128,13 +132,20 @@
         (erase-buffer))))
 
   (defun emux--write-to-emux-buffer (section content &optional force-section)
-    (if (and (not force-section)
-             (string= section last-section))
-        (emux--write-to-scrolling-buffer (emux-buffer) content)
+    (when (or force-section
+              (not (string= section last-section)))
+      (let ((shared-properties (list :section section)))
+        (setq last-section section
+              section-properties (cons 'face (cons emux-buffer-section-face
+                                                   shared-properties))
+              content-properties (cons 'face (cons emux-buffer-content-face
+                                                   shared-properties))))
       (emux--write-to-scrolling-buffer (emux-buffer)
-                                       "\n=== " section " ===\n"
-                                       content)
-      (setf last-section section))))
+                                       section-properties
+                                       "\n=== " section " ===\n"))
+    (emux--write-to-scrolling-buffer (emux-buffer)
+                                     content-properties
+                                     content)))
 
 (let (previous repeated-count)
   (defun emux--add-log (content)
@@ -148,13 +159,13 @@
                                       11))))
                  (delete-to (point-max)))
             (incf repeated-count)
-            (emux--write-to-scrolling-buffer (current-buffer)
+            (emux--write-to-scrolling-buffer (current-buffer) nil
                                              content " [" (int-to-string repeated-count) " times]\n")
             (let ((inhibit-read-only t))
               (delete-region delete-from delete-to))))
       (setq previous content
             repeated-count 1)
-      (emux--write-to-scrolling-buffer (emux-log-buffer)
+      (emux--write-to-scrolling-buffer (emux-log-buffer) nil
                                        content "\n"))))
 
 ;;; State buffer handling functions
