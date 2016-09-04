@@ -26,6 +26,22 @@
 (defvar emux--running-processes (make-hash-table :test 'equal))
 (defvar emux--inhibit-state-updates nil)
 
+(defun emux--set-header-line (line)
+  (with-current-buffer (emux-buffer)
+    (setq header-line-format line))
+  (with-current-buffer (emux-log-buffer)
+    (setq header-line-format line)))
+
+(defun emux--update-header-line (working-machines)
+  (emux--set-header-line
+   (if working-machines
+       (format "Working machine%s: %s"
+               (if (> (length working-machines) 1)
+                   "s"
+                 "")
+               (string-join working-machines " "))
+     "Working machine: localhost")))
+
 (defvar emux-buffer-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map special-mode-map)

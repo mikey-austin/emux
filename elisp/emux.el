@@ -22,11 +22,13 @@
 
 (require 'emux--buffers)
 (require 'emux--plumbing)
+(require 'subr-x)
 
 (defvar emux-path "emux")
 (defvar emux-default-socket "/tmp/emux.sock")
 
 (defvar emux--process-name "emux")
+(defvar emux-working-machines nil)
 
 (emux--defspec boolean () data
   (booleanp data))
@@ -110,6 +112,11 @@
                              (tags (option (vector string))))
   (emux--running-processes-stop id tags))
 
+(defun emux-set-working-machines (machines)
+  (interactive "MMachine(s): ")
+  (setq emux-working-machines (split-string machines " " t " "))
+  (emux--update-header-line emux-working-machines))
+
 (defun emux--default-socket ()
   (or (getenv "EMUX_SOCKET")
       emux-default-socket))
@@ -127,7 +134,8 @@
     (when (start-process emux--process-name (emux-buffer) emux-path)
       (set-process-filter (get-process emux--process-name)
                           #'emux--process-filter)))
-  (emux--clear-running-processes))
+  (emux--clear-running-processes)
+  (emux--update-header-line emux-working-machines))
 
 (defun emux-finish-client ()
   (interactive)
