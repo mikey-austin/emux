@@ -21,6 +21,7 @@
 ;;; Code:
 
 (require 'json)
+(require 'cl)
 (require 'subr-x)
 
 (defvar emux--response-type-table (make-hash-table :test 'equal))
