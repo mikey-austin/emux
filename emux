@@ -22,6 +22,7 @@ GetOptions(
     "group=s"   => \$options->{group},
     "host=s"    => \$options->{host},
     "port=s"    => \$options->{port},
+    "websocket" => \$options->{websocket},
     "logger=s"  => \$options->{logger},
     "stdin"     => \$options->{listen_stdin},
     "stdout"    => \$options->{broadcast_stdout},

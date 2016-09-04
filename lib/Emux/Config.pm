@@ -15,6 +15,7 @@ use constant {
         host             => '',
         port             => '',
         listen_stdin     => 0,
+        websocket        => 0,
         broadcast_stdout => 0,
         control_path     => "$ENV{HOME}/.ssh/emux_\%C",
     }

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Emux::Message qw(:constants);
+use Emux::Client;
 use Emux::CommandFactory;
 use Emux::ProcessManager;
 use IO::Select;
@@ -26,7 +27,7 @@ sub new {
         _muted       => {},
         _clients     => {
             $config->get('broadcast_stdout')
-                ? ( "*STDOUT" => *STDOUT ) : ()
+                ? ( "*STDOUT" => Emux::Client->new(handle => *STDOUT) ) : ()
         },
         _select      => IO::Select->new,
     };
@@ -75,18 +76,11 @@ sub start {
         while (my @ready = $self->{_select}->can_read) {
             foreach my $handle (grep defined $_, @ready) {
                 if ($self->is_listener($handle)) {
-                    my $client = $handle->accept;
-                    my $from;
-                    if ($client->can('peerhost')) {
-                        my ($peer, $port) = ($client->peerhost, $client->peerport);
-                        $from = "$peer:$port";
-                    }
-                    elsif ($client->can('hostpath')) {
-                        $from = $client->hostpath;
-                    }
-                    $self->{_logger}->info("Accepted connection from $from");
-                    $self->{_select}->add($client);
-                    $self->{_clients}->{$client} = $client;
+                    my $client = $self->accept_client($handle);
+                    $self->{_logger}->info(
+                        'Accepted connection from %s', $client->from);
+                    $self->{_select}->add($client->fh);
+                    $self->{_clients}->{$client->fh} = $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
                     my $process = $self->{_procs}->{$handle};
@@ -98,16 +92,17 @@ sub start {
                     $self->handle_proc_output(
                         TYPE_ERROR_OUTPUT, $process, $handle);
                 }
-                elsif (defined $self->{_clients}->{$handle}) {
+                elsif (my $client = $self->{_clients}->{$handle}) {
                     my ($message, $error);
                     eval {
-                        # Check if the client disconnected.
-                        $self->disconnect($handle)
-                            unless $handle->can('connected') and $handle->connected;
-
-                        $message = Emux::Message->from_handle($handle, $self->{_cmd_factory});
-                        $message->command->execute
-                            if $message and $message->command;
+                        if ($client->connected) {
+                            $message = $client->receive($self->{_cmd_factory});
+                            $message->command->execute
+                                if $message and $message->command;
+                        }
+                        else {
+                            $self->disconnect($handle);
+                        }
                         1;
                     } or do {
                         $error = $@;
@@ -125,6 +120,17 @@ sub start {
     }
 
     # Never reached.
+}
+
+sub accept_client {
+    my ($self, $handle) = @_;
+
+    my $client = Emux::Client->new(
+        handle        => scalar $handle->accept,
+        ws_upgradable => ($self->{_config}->get('websocket') // 0),
+    );
+
+    return $client;
 }
 
 sub disconnect {
@@ -173,6 +179,14 @@ sub register_listeners {
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $host:$port");
         $listeners++;
+
+        if ($self->{_config}->get('websocket')) {
+            $self->{_logger}->info("Enabling websocket support on $host:$port");
+            require 'Protocol::Websocket::Handshake::Server';
+        }
+    }
+    elsif ($self->{_config}->get('websocket')) {
+        die 'host & port options must be specified if using websockets';
     }
 
     die 'no listeners defined'
@@ -278,7 +292,7 @@ sub handle_proc_output {
 
 sub broadcast_message {
     my ($self, $message) = @_;
-    printf { $_ } "%s\n", $message->encode
+    $_->send($message)
         foreach values %{$self->{_clients}};
 }
 
