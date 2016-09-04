@@ -184,7 +184,7 @@
     (mapc register-f process-vector)
     (emux-write-state-buffer)))
 
-(defun emux--register-running-process (id tags machine command)
+(defun emux--register-running-process (id &optional tags machine command)
   (unless (gethash id emux--running-processes)
     (puthash id
              (list :id id :tags tags

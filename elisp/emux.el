@@ -66,7 +66,8 @@
 (emux--defresponse-type output ((id string) (content string))
   (let ((decoded (base64-decode-string content)))
     (emux--broadcast 'output id decoded)
-    (emux--write-to-emux-buffer id decoded)))
+    (emux--write-to-emux-buffer id decoded))
+  (emux--register-running-process id))
 
 (defun emux--broadcast (kind id data)
   ;; just a hack for now
