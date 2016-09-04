@@ -5,7 +5,7 @@
 (require 'subr-x)
 
 (let* ((files-to-load '("emux--plumbing.el" "emux--buffers.el" "emux.el"))
-       (file-path load-file-name)
+       (file-path (or load-file-name (buffer-file-name)))
        (split-path (split-string file-path "/"))
        (base-path-reversed (cdr (reverse split-path))))
   (add-to-list 'load-path (string-join (reverse base-path-reversed) "/"))
