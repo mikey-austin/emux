@@ -64,7 +64,6 @@
     (define-key map "u" 'emux-state-buffer-unmute)
     (define-key map "x" 'emux-state-buffer-execute)
     (define-key map "c" 'emux-state-buffer-clear-op)
-    (define-key map "C" 'emux-write-state-buffer)
     (define-key map "l" 'emux-switch-to-log-buffer)
     (define-key map "b" 'emux-switch-to-buffer)
     (define-key map "s" 'emux-switch-to-state-buffer)
@@ -182,7 +181,7 @@
     (let ((emux--inhibit-state-updates t))
       (emux--clear-running-processes))
     (mapc register-f process-vector)
-    (emux-write-state-buffer)))
+    (emux--write-state-buffer)))
 
 (defun emux--register-running-process (id &optional tags machine command)
   (unless (gethash id emux--running-processes)
@@ -195,7 +194,7 @@
 
 (defun emux--deregister-id (id)
   (remhash id emux--running-processes)
-  (emux-write-state-buffer)
+  (emux--write-state-buffer)
   (emux--schedule-state-message))
 
 (defun emux--string-vector-member (elt vector)
@@ -248,8 +247,7 @@
             emux--running-processes)
     result))
 
-(defun emux-write-state-buffer ()
-  (interactive)
+(defun emux--write-state-buffer ()
   (unless emux--inhibit-state-updates
     (with-current-buffer (emux-state-buffer)
       (setq tabulated-list-format (vector
@@ -266,7 +264,7 @@
       (tabulated-list-print t))))
 
 (defun emux--write-state-schedule-message ()
-  (emux-write-state-buffer)
+  (emux--write-state-buffer)
   (emux--schedule-state-message))
 
 (defun emux-state-buffer-stop ()
