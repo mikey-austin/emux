@@ -155,7 +155,7 @@
 
 (let (rest)
  (defun emux--process-filter (process output)
-   (let ((lines (split-string output "\n" t " ")))
+   (let ((lines (split-string output "\n" t split-string-default-separators)))
      (dolist (l lines)
        (when rest
          (setq l (concat rest l)

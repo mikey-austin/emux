@@ -96,8 +96,8 @@
       nil
     string))
 
-(defun emux--split-string-to-vector (string)
-  (apply 'vector (split-string string " " t " ")))
+(defun emux--read-option-vector-string (prompt &optional initial-value history)
+  (vconcat (split-string (read-string prompt initial-value history))))
 
 (emux--defmessage-type execute ((id string)
                                 (command string)
@@ -106,8 +106,8 @@
   (interactive
    (let* ((input-id (read-string "Id: " nil 'emux-id-history))
           (input-command (read-string "Command: " nil 'emux-command-history))
-          (input-machine (emux--string-or-nil (read-string "Machine: " nil 'emux-machine-history)))
-          (input-tags (emux--split-string-to-vector (read-string "Tags: " input-machine 'emux-tags-history))))
+          (input-machine (read-string "Machine: " nil 'emux-machine-history))
+          (input-tags (emux--read-option-vector-string "Tags: " input-machine 'emux-tags-history)))
      (list :id input-id :command input-command :machine input-machine :tags input-tags)))
   (emux--register-running-process id tags machine command))
 
@@ -117,28 +117,57 @@
 
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string))))
-  (interactive (list
-                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
-                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
+  (interactive
+   (list
+    :id (emux--read-option-vector-string "Ids: " nil 'emux-ids-history)
+    :tags (emux--read-option-vector-string "Tags: " nil 'emux-tags-history)))
   (emux--running-processes-set id tags :muted t))
 
 (emux--defmessage-type unmute ((id (option (vector string)))
                                (tags (option (vector string))))
-  (interactive (list
-                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
-                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
+  (interactive
+   (list
+    :id (emux--read-option-vector-string "Ids: " nil 'emux-ids-history)
+    :tags (emux--read-option-vector-string "Tags: " nil 'emux-tags-history)))
   (emux--running-processes-set id tags :muted nil))
 
 (emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string))))
-  (interactive (list
-                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
-                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
+  (interactive
+   (list
+    :id (emux--read-option-vector-string "Ids: " nil 'emux-ids-history)
+    :tags (emux--read-option-vector-string "Tags: " nil 'emux-tags-history)))
   (emux--running-processes-stop id tags))
 
+(defun emux--id-from-command-machine (command machine)
+  (replace-regexp-in-string "[^[:alpha:]]" "_"
+                            (concat command "_" machine)))
+
+(defun emux-run-command-on (command machines)
+  (interactive
+   (list
+    (read-string "Command: " nil 'emux-command-history)
+    (emux--read-option-string-vector "Machines: " nil 'emux-machines-history)))
+  (if (or (not machines)
+          (= 0 (length machines)))
+    (emux-execute :id (emux--id-from-command-machine command nil)
+                  :command command))
+  (mapc (lambda (m)
+          (emux-execute :id (emux--id-from-command-machine command m)
+                        :tags (vector m)
+                        :machine m
+                        :command command))
+        machines))
+
+(defun emux-run-command (command)
+  (interactive (list (read-string "Command: " nil 'emux-command-history)))
+  (emux-run-command-on command emux-working-machines))
+
 (defun emux-set-working-machines (machines)
-  (interactive "MMachines: ")
-  (setq emux-working-machines (split-string machines " " t " "))
+  (interactive
+   (list
+    (emux--read-option-vector-string "Machines: " nil 'emux-machines-history)))
+  (setq emux-working-machines machines)
   (emux--update-header-line emux-working-machines))
 
 (defun emux--default-socket ()
