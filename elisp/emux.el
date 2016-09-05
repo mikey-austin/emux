@@ -91,10 +91,24 @@
                                (processes (vector process)))
   (emux--reset-running-processes processes))
 
+(defun emux--string-or-nil (string)
+  (if (string-blank-p string)
+      nil
+    string))
+
+(defun emux--split-string-to-vector (string)
+  (apply 'vector (split-string string " " t " ")))
+
 (emux--defmessage-type execute ((id string)
                                 (command string)
                                 (machine (option string))
                                 (tags (option (vector string))))
+  (interactive
+   (let* ((input-id (read-string "Id: " nil 'emux-id-history))
+          (input-command (read-string "Command: " nil 'emux-command-history))
+          (input-machine (emux--string-or-nil (read-string "Machine: " nil 'emux-machine-history)))
+          (input-tags (emux--split-string-to-vector (read-string "Tags: " input-machine 'emux-tags-history))))
+     (list :id input-id :command input-command :machine input-machine :tags input-tags)))
   (emux--register-running-process id tags machine command))
 
 (emux--defmessage-type pipeline ((pipeline (vector pipeline-command))))
@@ -103,18 +117,27 @@
 
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string))))
+  (interactive (list
+                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
+                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
   (emux--running-processes-set id tags :muted t))
 
 (emux--defmessage-type unmute ((id (option (vector string)))
                                (tags (option (vector string))))
+  (interactive (list
+                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
+                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
   (emux--running-processes-set id tags :muted nil))
 
 (emux--defmessage-type stop ((id (option (vector string)))
                              (tags (option (vector string))))
+  (interactive (list
+                :id (emux--split-string-to-vector (read-string "Ids: " nil 'emux-ids-history))
+                :tags (emux--split-string-to-vector (read-string "Tags: " nil 'emux-tags-history))))
   (emux--running-processes-stop id tags))
 
 (defun emux-set-working-machines (machines)
-  (interactive "MMachine(s): ")
+  (interactive "MMachines: ")
   (setq emux-working-machines (split-string machines " " t " "))
   (emux--update-header-line emux-working-machines))
 
