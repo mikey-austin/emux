@@ -147,7 +147,7 @@
   (interactive
    (list
     (read-string "Command: " nil 'emux-command-history)
-    (emux--read-option-string-vector "Machines: " nil 'emux-machines-history)))
+    (emux--read-option-vector-string "Machines: " nil 'emux-machines-history)))
   (if (or (not machines)
           (= 0 (length machines)))
     (emux-execute :id (emux--id-from-command-machine command nil)
