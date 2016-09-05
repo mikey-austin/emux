@@ -51,6 +51,14 @@
     (define-key map "l" 'emux-switch-to-log-buffer)
     (define-key map "b" 'emux-switch-to-buffer)
     (define-key map "s" 'emux-switch-to-state-buffer)
+    (define-key map "e" 'emux-execute)
+    (define-key map "m" 'emux-mute)
+    (define-key map "u" 'emux-unmute)
+    (define-key map "d" 'emux-stop)
+    (define-key map "e" 'emux-execute)
+    (define-key map "r" 'emux-run-command)
+    (define-key map "R" 'emux-run-command-on)
+    (define-key map "w" 'emux-set-working-machines)
     map))
 
 (define-derived-mode emux-buffer-mode special-mode "Emux"
