@@ -111,7 +111,7 @@ sub start {
                     if ($error) {
                         $self->{_logger}->err("error processing message: $error");
                     }
-                    elsif (not (defined $message and defined $message->command)) {
+                    elsif (not ($message and $message->command) and not $client->connected) {
                         $self->disconnect($handle);
                     }
                 }
@@ -125,7 +125,14 @@ sub start {
 sub accept_client {
     my ($self, $handle) = @_;
 
-    my $client = Emux::Client->new(
+    my $class = 'Emux::Client';
+    if ($self->{_config}->get('websocket')) {
+        require Emux::Client::Websocket;
+        $class = 'Emux::Client::Websocket'
+            if UNIVERSAL::isa($handle, 'IO::Socket::INET');
+    }
+
+    my $client = $class->new(
         handle        => scalar $handle->accept,
         ws_upgradable => ($self->{_config}->get('websocket') // 0),
     );
@@ -179,11 +186,6 @@ sub register_listeners {
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $host:$port");
         $listeners++;
-
-        if ($self->{_config}->get('websocket')) {
-            $self->{_logger}->info("Enabling websocket support on $host:$port");
-            require 'Protocol::Websocket::Handshake::Server';
-        }
     }
     elsif ($self->{_config}->get('websocket')) {
         die 'host & port options must be specified if using websockets';

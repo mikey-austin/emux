@@ -10,7 +10,6 @@ sub new {
     my $self = {
         _handle        => $args{handle},
         _ws_upgradable => $args{ws_upgradable},
-        _websocket     => 0,
     };
 
     bless $self, $class;
