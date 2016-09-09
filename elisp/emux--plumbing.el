@@ -132,12 +132,15 @@
 (defmacro emux--defresponse-type (name args &rest body)
   (let* ((args-and-specs (cl-gensym))
          (arg-names (mapcar 'car args))
-         (func `(lambda ,arg-names ,@body)))
-    `(let ((,args-and-specs (mapcar 'emux--extract-arg-name-and-spec
-                                    ',args)))
-       (puthash (symbol-name ',name)
-                (emux--validate-apply ,args-and-specs ,func)
-                emux--response-type-table))))
+         (hook-var-name (intern (concat "emux-" (symbol-name name) "-response-hook")))
+         (func `(lambda ,arg-names ,@body (run-hook-with-args ',hook-var-name ,@arg-names))))
+    `(progn
+       (defvar ,hook-var-name nil)
+       (let ((,args-and-specs (mapcar 'emux--extract-arg-name-and-spec
+                                     ',args)))
+        (puthash (symbol-name ',name)
+                 (emux--validate-apply ,args-and-specs ,func)
+                 emux--response-type-table)))))
 (put 'emux--defresponse-type 'lisp-indent-function 2)
 
 (defun emux--json-decode (json-str)
