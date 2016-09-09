@@ -283,6 +283,7 @@ sub handle_proc_output {
         my $message = Emux::Message->new($type);
         $message->body({
             id      => $process->id,
+            tags    => $process->tags,
             content => encode_base64($output),
         });
         $self->broadcast_message($message);

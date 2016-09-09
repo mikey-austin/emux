@@ -63,7 +63,7 @@
     :machine (option string)
     :tags (option (vector string))))
 
-(emux--defresponse-type output ((id string) (content string))
+(emux--defresponse-type output ((id string) (tags (vector string)) (content string))
   (let ((decoded (base64-decode-string content)))
     (emux--broadcast 'output id decoded)
     (emux--write-to-emux-buffer id decoded))
