@@ -31,7 +31,9 @@ sub run_process {
     die sprintf "process %s already exists\n", $process->id
         if $self->{_procs}->{id}->{$process->id};
 
-    $self->_check_master($process);
+    $self->_check_master($process)
+        unless $process->host eq 'localhost';
+
     my ($pid, $fh, $errors) = $self->_fork(
         routine => sub {
             my ($fh, $errors) = @_;
