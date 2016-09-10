@@ -22,11 +22,14 @@
 
 (require 'tabulated-list)
 (require 'subr-x)
+(require 'cl)
+
+(defvar emux-buffer-header-face font-lock-comment-face)
+(defvar emux-buffer-content-face nil)
+(defvar emux-buffer-before-change-functions nil)
 
 (defvar emux--running-processes (make-hash-table :test 'equal))
 (defvar emux--inhibit-state-updates nil)
-(defvar emux-buffer-section-face font-lock-comment-face)
-(defvar emux-buffer-content-face nil)
 
 (defun emux--set-header-line (line)
   (with-current-buffer (emux-buffer)
@@ -130,29 +133,47 @@
    (with-current-buffer (emux-log-buffer)
      (erase-buffer))))
 
-(let (last-section content-properties section-properties)
+(let (last-id last-type)
   (defun emux-erase-buffer ()
     (interactive)
-    (setq last-section nil)
+    (setq last-id nil
+          last-type nil)
     (let ((inhibit-read-only t))
       (with-current-buffer (emux-buffer)
         (erase-buffer))))
 
-  (defun emux--write-to-emux-buffer (section content &optional force-section)
-    (when (or force-section
-              (not (string= section last-section)))
-      (let ((shared-properties (list :section section)))
-        (setq last-section section
-              section-properties (cons 'face (cons emux-buffer-section-face
-                                                   shared-properties))
-              content-properties (cons 'face (cons emux-buffer-content-face
-                                                   shared-properties))))
-      (emux--write-to-scrolling-buffer (emux-buffer)
-                                       section-properties
-                                       "\n=== " section " ===\n"))
-    (emux--write-to-scrolling-buffer (emux-buffer)
-                                     content-properties
-                                     content)))
+  (defun emux--write-finished (id tags exit-code)
+    (emux--write-to-scrolling-buffer
+     (emux-buffer)
+     `(:header t :id ,id :tags ,tags face ,emux-buffer-header-face :type finished)
+     (format "\n=== %s (exit code: %d) ===\n" id exit-code))
+    (setq last-id id
+          last-type 'finished))
+
+  (cl-flet
+      ((write-to-buffer (section content id tags type)
+         (when (run-hook-with-args-until-failure 'emux-buffer-before-change-functions
+                                                 id tags type content)
+           (let ((buf (emux-buffer))
+                 (shared-properties `(:id ,id :tags ,tags :type ,type)))
+             (unless (and (string= id last-id)
+                          (eq type last-type))
+               (emux--write-to-scrolling-buffer
+                buf
+                `(face ,emux-buffer-header-face :header t ,@shared-properties)
+                "\n=== " section " ===\n")
+               (setq last-type type
+                     last-id id))
+             (emux--write-to-scrolling-buffer
+              buf
+              `(face ,emux-buffer-content-face ,@shared-properties)
+              content)))))
+
+    (defun emux--write-output (id tags content)
+      (write-to-buffer id content id tags 'output))
+
+    (defun emux--write-error-output (id tags content)
+      (write-to-buffer (concat id " (stderr)") content id tags 'error-output))))
 
 (let (previous repeated-count)
   (defun emux--add-log (content)
@@ -212,6 +233,7 @@
         (cl-return-from func t)))))
 
 (defmacro emux--do-running-processes (id proc ids tags &rest body)
+  (declare (indent 4))
   `(progn
      (maphash (lambda (,id ,proc)
                 (when (or (emux--string-vector-member ,id ,ids)
@@ -221,7 +243,6 @@
                   ,@body))
               emux--running-processes)
      (emux--write-state-schedule-message)))
-(put 'emux--do-running-processes 'lisp-indent-function 4)
 
 (defun emux--running-processes-set (ids tags prop value)
   (emux--do-running-processes id proc ids tags
@@ -300,6 +321,7 @@
     (forward-line 1)))
 
 (defmacro emux--do-state-buffer (var &rest body)
+  (declare (indent 1))
   `(with-current-buffer (emux-state-buffer)
      (save-excursion
        (goto-char (point-min))
@@ -307,7 +329,6 @@
          (let ((,var (tabulated-list-get-entry)))
            (when ,var
              ,@body))))))
-(put 'emux--do-state-buffer 'lisp-indent-function 1)
 
 (defun emux-state-buffer-execute ()
   (interactive)

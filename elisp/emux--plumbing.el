@@ -40,6 +40,7 @@
   (make-emux--result :variant :error :value err))
 
 (defmacro emux--result-match (binding &rest body)
+  (declare (indent 1))
   (let ((val (cl-gensym))
         (var (car binding))
         (value (cadr binding)))
@@ -47,10 +48,10 @@
             (,var (emux--result-value ,val)))
        (case (emux--result-variant ,val)
          ,@body))))
-(put 'emux--result-match 'lisp-indent-function 1)
 
 (defmacro emux--result-do (binding &rest body)
   "With VAR bound to the value in VAL if it's the :ok variant, evaluate the forms in BODY.  Return VAL if it is the :error variant."
+  (declare (indent 1))
   (let ((val (cl-gensym))
         (var (car binding))
         (value (cadr binding)))
@@ -58,7 +59,6 @@
        (emux--result-match (,var ,val)
          (:error ,val)
          (:ok ,@body)))))
-(put 'emux--result-do 'lisp-indent-function 1)
 
 (defun emux--result-seq-map (f xs)
   (block func-body
@@ -96,10 +96,10 @@
   (emux--prefix-symbol "emux--spec-" name))
 
 (defmacro emux--defspec (name type-args data-var &rest body)
+  (declare (indent 3))
   `(defun ,(emux--make-spec-func-name name) (,@type-args)
      (lambda (,data-var)
        ,@body)))
-(put 'emux--defspec 'lisp-indent-function 3)
 
 (defun emux--getspec-sexp (spec-s)
   (if (symbolp spec-s)
@@ -130,10 +130,13 @@
       (emux--result-ok (apply func values)))))
 
 (defmacro emux--defresponse-type (name args &rest body)
+  (declare (indent 2))
   (let* ((args-and-specs (cl-gensym))
          (arg-names (mapcar 'car args))
-         (hook-var-name (intern (concat "emux-" (symbol-name name) "-response-hook")))
-         (func `(lambda ,arg-names ,@body (run-hook-with-args ',hook-var-name ,@arg-names))))
+         (hook-var-name (intern (concat "emux-" (symbol-name name) "-response-functions")))
+         (func `(lambda ,arg-names
+                  ,@body
+                  (run-hook-with-args ',hook-var-name ,@arg-names))))
     `(progn
        (defvar ,hook-var-name nil)
        (let ((,args-and-specs (mapcar 'emux--extract-arg-name-and-spec
@@ -141,7 +144,6 @@
         (puthash (symbol-name ',name)
                  (emux--validate-apply ,args-and-specs ,func)
                  emux--response-type-table)))))
-(put 'emux--defresponse-type 'lisp-indent-function 2)
 
 (defun emux--json-decode (json-str)
   (let* ((json-array-type 'vector)
@@ -200,6 +202,7 @@
                    symbol-list :initial-value ())))
 
 (defmacro emux--defmessage-type (name args &rest body)
+  (declare (indent 2))
   (let ((arg-names (mapcar 'car args))
         (spec-sexps (mapcar 'cadr args))
         (specs (cl-gensym))
@@ -219,9 +222,9 @@
                                                           arg-names))
                 ,@body)
            (:error (error ,val)))))))
-(put 'emux--defmessage-type 'lisp-indent-function 2)
 
 (defmacro emux--obj-with-keys (obj &rest key-type-pairs)
+  (declare (indent 1))
   (let (spec-list)
     (while key-type-pairs
       (let ((key (pop key-type-pairs))
@@ -229,7 +232,6 @@
         (push `(funcall ,spec-sexp (plist-get ,obj ,key)) spec-list)))
    `(and (listp ,obj)
          ,@spec-list)))
-(put 'emux--obj-with-keys 'lisp-indent-function 1)
 
 (provide 'emux--plumbing)
 ;;; emux--plumbing.el ends here

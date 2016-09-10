@@ -27,8 +27,9 @@
 (defvar emux-path "emux")
 (defvar emux-default-socket "/tmp/emux.sock")
 
-(defvar emux--process-name "emux")
 (defvar emux-working-machines nil)
+
+(defvar emux--process-name "emux")
 
 (emux--defspec boolean () data
   (booleanp data))
@@ -66,7 +67,7 @@
 (emux--defresponse-type output ((id string) (tags (vector string)) (content string))
   (let ((decoded (base64-decode-string content)))
     (emux--broadcast 'output id decoded)
-    (emux--write-to-emux-buffer id decoded))
+    (emux--write-output id tags decoded))
   (emux--register-running-process id))
 
 (defun emux--broadcast (kind id data)
@@ -76,7 +77,7 @@
 
 (emux--defresponse-type finished ((id string) (exit_code integer))
   (emux--broadcast 'finished id exit_code)
-  (emux--write-to-emux-buffer (format "%s (exit code: %i)" id exit_code) "" t)
+  (emux--write-finished id [] exit_code)
   (emux--deregister-id id))
 
 (emux--defresponse-type error_output ((id (option string)) (content string))
@@ -84,7 +85,7 @@
     (emux--broadcast 'error id content)
     (if (null id)
         (emux--add-log content)
-      (emux--write-to-emux-buffer (concat id " (stderr)") content)
+      (emux--write-error-output id [] content)
       (emux--register-running-process id))))
 
 (emux--defresponse-type state ((tags (vector string))
