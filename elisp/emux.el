@@ -68,25 +68,27 @@
   (let ((decoded (base64-decode-string content)))
     (emux--broadcast 'output id decoded)
     (emux--write-output id tags decoded))
-  (emux--register-running-process id))
+  (emux--register-running-process id tags))
 
 (defun emux--broadcast (kind id data)
   ;; just a hack for now
   (when (functionp 'emux--repl-handle-output)
     (emux--repl-handle-output kind id data)))
 
-(emux--defresponse-type finished ((id string) (exit_code integer))
+(emux--defresponse-type finished ((id string) (tags (vector string)) (exit_code integer))
   (emux--broadcast 'finished id exit_code)
-  (emux--write-finished id [] exit_code)
+  (emux--write-finished id tags exit_code)
   (emux--deregister-id id))
 
-(emux--defresponse-type error_output ((id (option string)) (content string))
+(emux--defresponse-type error_output ((id (option string))
+                                      (tags (option (vector string)))
+                                      (content string))
   (let ((content (base64-decode-string content)))
     (emux--broadcast 'error id content)
     (if (null id)
         (emux--add-log content)
-      (emux--write-error-output id [] content)
-      (emux--register-running-process id))))
+      (emux--write-error-output id tags content)
+      (emux--register-running-process id tags))))
 
 (emux--defresponse-type state ((tags (vector string))
                                (processes (vector process)))

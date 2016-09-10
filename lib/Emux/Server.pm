@@ -251,6 +251,7 @@ sub deregister_process {
     my $message = Emux::Message->new(TYPE_FINISHED);
     $message->body({
         id        => $process->id,
+        tags      => $process->tags,
         exit_code => int($exit_status) || 0,
     });
     $self->broadcast_message($message);
