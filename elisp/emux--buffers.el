@@ -173,7 +173,7 @@
       (write-to-buffer id content id tags 'output))
 
     (defun emux--write-error-output (id tags content)
-      (write-to-buffer (concat id " (stderr)") content id tags 'error-output))))
+      (write-to-buffer (concat id " (stderr)") content id tags 'error_output))))
 
 (let (previous repeated-count)
   (defun emux--add-log (content)
