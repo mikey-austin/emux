@@ -8,6 +8,7 @@ use JSON;
 
 use constant {
     TYPE_EXECUTE      => 'execute',
+    TYPE_INPUT        => 'input',
     TYPE_PIPELINE     => 'pipeline',
     TYPE_OUTPUT       => 'output',
     TYPE_STATE        => 'state',
@@ -20,6 +21,7 @@ use constant {
 
 our @constants = qw(
     TYPE_EXECUTE
+    TYPE_INPUT
     TYPE_PIPELINE
     TYPE_OUTPUT
     TYPE_STATE

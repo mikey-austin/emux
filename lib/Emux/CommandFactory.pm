@@ -6,6 +6,18 @@ use Module::Load qw(load);
 
 use Emux::Message qw(:constants);
 
+use constant {
+    TYPES => {
+        TYPE_EXECUTE()  => 'Execute',
+        TYPE_INPUT()    => 'Input',
+        TYPE_PIPELINE() => 'Pipeline',
+        TYPE_STATE()    => 'State',
+        TYPE_STOP()     => 'Stop',
+        TYPE_MUTE()     => 'Mute',
+        TYPE_UNMUTE()   => 'Unmute',
+    }
+};
+
 sub new {
     my ($class, $server) = @_;
     my $self = {
@@ -17,28 +29,9 @@ sub new {
 sub create {
     my ($self, $type) = @_;
 
-    my ($namespace, $class) = ('Emux::Command::');
-    if ($type eq TYPE_EXECUTE) {
-        $class = 'Execute';
-    }
-    elsif ($type eq TYPE_PIPELINE) {
-        $class = 'Pipeline';
-    }
-    elsif ($type eq TYPE_STATE) {
-        $class = 'State';
-    }
-    elsif ($type eq TYPE_STOP) {
-        $class = 'Stop';
-    }
-    elsif ($type eq TYPE_MUTE) {
-        $class = 'Mute';
-    }
-    elsif ($type eq  TYPE_UNMUTE) {
-        $class = 'Unmute';
-    }
-    else {
-        die "could not make command of type $type";
-    }
+    my ($namespace, $class) = ('Emux::Command::', TYPES->{$type});
+    die "could not make command of type $type"
+        unless $class;
 
     my $abs_class = "${namespace}${class}";
     load($abs_class);

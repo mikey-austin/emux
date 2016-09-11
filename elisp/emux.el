@@ -118,6 +118,15 @@
 
 (emux--defmessage-type state ())
 
+(emux--defmessage-type input ((id (option (vector string)))
+                              (tags (option (vector string)))
+                              (input string))
+  (interactive
+   (list
+    :input (read-string "Input: " nil 'emux-input-history)
+    :id (emux--read-option-vector-string "Ids: " nil 'emux-ids-history)
+    :tags (emux--read-option-vector-string "Tags: " nil 'emux-tags-history))))
+
 (emux--defmessage-type mute ((id (option (vector string)))
                              (tags (option (vector string))))
   (interactive

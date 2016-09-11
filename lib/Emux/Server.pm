@@ -7,7 +7,7 @@ use Emux::Message qw(:constants);
 use Emux::Client;
 use Emux::CommandFactory;
 use Emux::ProcessManager;
-use IO::Select;
+use IO::Poll;
 use IO::Handle;
 use IO::Socket::INET;
 use IO::Socket::UNIX;
@@ -29,7 +29,7 @@ sub new {
             $config->get('broadcast_stdout')
                 ? ( "*STDOUT" => Emux::Client->new(handle => *STDOUT) ) : ()
         },
-        _select      => IO::Select->new,
+        _poll        => IO::Poll->new,
     };
     bless $self, $class;
 
@@ -73,13 +73,14 @@ sub start {
     );
 
     for (;;) {
-        while (my @ready = $self->{_select}->can_read) {
-            foreach my $handle (grep defined $_, @ready) {
+        # Readers.
+        while ($self->{_poll}->poll) {
+            foreach my $handle ($self->{_poll}->handles(POLLIN)) {
                 if ($self->is_listener($handle)) {
                     my $client = $self->accept_client($handle);
                     $self->{_logger}->info(
                         'Accepted connection from %s', $client->from);
-                    $self->{_select}->add($client->fh);
+                    $self->{_poll}->mask($client->fh, POLLIN | POLLOUT);
                     $self->{_clients}->{$client->fh} = $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
@@ -116,6 +117,13 @@ sub start {
                     }
                 }
             }
+
+            foreach my $handle ($self->{_poll}->handles(POLLOUT)) {
+                if ($self->is_proc_fh($handle)) {
+                    my $process = $self->{_procs}->{$handle};
+                    $self->handle_proc_input($process, $handle);
+                }
+            }
         }
     }
 
@@ -142,7 +150,7 @@ sub accept_client {
 
 sub disconnect {
     my ($self, $handle) = @_;
-    $self->{_select}->remove($handle);
+    $self->{_poll}->remove($handle);
     $handle->close
         if $handle->can('close');
     delete $self->{_clients}->{$handle};
@@ -155,7 +163,7 @@ sub register_listeners {
     if ($self->{_config}->get('listen_on_stdin')
         and not $self->{_config}->get('daemonize'))
     {
-        $self->{_select}->add(*STDIN);
+        $self->{_poll}->mask(*STDIN, POLLIN);
         $self->{_logger}->info("Listening on STDIN");
         $listeners++;
     }
@@ -166,7 +174,7 @@ sub register_listeners {
             Type   => SOCK_STREAM,
             Listen => 5,
         ) or die "Could not initialize socket at $socket: $!";
-        $self->{_select}->add($fh);
+        $self->{_poll}->mask($fh, POLLIN);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $socket");
         $listeners++;
@@ -182,7 +190,7 @@ sub register_listeners {
             Listen    => 5,
             Type      => SOCK_STREAM,
         ) or die "Could not bind at address $host:$port: $!\n";
-        $self->{_select}->add($fh);
+        $self->{_poll}->mask($fh, POLLIN);
         push @{$self->{_listeners}}, $fh;
         $self->{_logger}->info("Listening on $host:$port");
         $listeners++;
@@ -223,13 +231,21 @@ sub is_muted {
     return exists $self->{_muted}->{$proc->id};
 }
 
+sub schedule_write {
+    my ($self, $input, @ids) = @_;
+    foreach my $id (@ids) {
+        push @{$self->{_writers}->{$id}}, $input;
+    }
+}
+
 sub register_process {
     my ($self, $process) = @_;
     eval {
         $self->{_proc_manager}->run_process($process);
-        $self->{_select}->add($process->fh);
-        $self->{_select}->add($process->errors);
+        $self->{_poll}->mask($process->fh, POLLIN | POLLOUT);
+        $self->{_poll}->mask($process->errors, POLLIN);
         $self->{_procs}->{$process->fh} = $process;
+        $self->{_procs}->{$process->id} = $process;
         $self->{_proc_errors}->{$process->errors} = $process;
         1;
     } or do {
@@ -241,11 +257,13 @@ sub register_process {
 
 sub deregister_process {
     my ($self, $process, $exit_status) = @_;
-    $self->{_select}->remove($process->fh);
-    $self->{_select}->remove($process->errors);
+    $self->{_poll}->remove($process->fh);
+    $self->{_poll}->remove($process->errors);
     delete $self->{_procs}->{$process->fh};
+    delete $self->{_procs}->{$process->id};
     delete $self->{_proc_errors}->{$process->errors};
     delete $self->{_muted}->{$process->id};
+    delete $self->{_writers}->{$process->id};
 
     # Broadcast a finished message.
     my $message = Emux::Message->new(TYPE_FINISHED);
@@ -265,6 +283,18 @@ sub is_proc_fh {
 sub is_proc_error_fh {
     my ($self, $fh) = @_;
     return $fh && $self->{_proc_errors}->{$fh};
+}
+
+sub handle_proc_input {
+    my ($self, $process, $handle) = @_;
+
+    if (exists $self->{_writers}->{$process->id}
+        and @{$self->{_writers}->{$process->id}} > 0)
+    {
+        $self->{_logger}->debug('writing to ' . $process->id);
+        my $input = shift @{$self->{_writers}->{$process->id}};
+        print { $handle } "$input\n";
+    }
 }
 
 sub handle_proc_output {
