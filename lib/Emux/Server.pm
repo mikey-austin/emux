@@ -74,13 +74,13 @@ sub start {
 
     for (;;) {
         # Readers.
-        while ($self->{_poll}->poll) {
+        if ($self->{_poll}->poll > 0) {
             foreach my $handle ($self->{_poll}->handles(POLLIN)) {
                 if ($self->is_listener($handle)) {
                     my $client = $self->accept_client($handle);
                     $self->{_logger}->info(
                         'Accepted connection from %s', $client->from);
-                    $self->{_poll}->mask($client->fh, POLLIN | POLLOUT);
+                    $self->{_poll}->mask($client->fh, POLLIN);
                     $self->{_clients}->{$client->fh} = $client;
                 }
                 elsif ($self->is_proc_fh($handle)) {
@@ -116,6 +116,11 @@ sub start {
                         $self->disconnect($handle);
                     }
                 }
+                else {
+                    # Input will not be read, so mask out poll event.
+                    my $mask = $self->{_poll}->mask($handle);
+                    $self->{_poll}->mask($handle, $mask & ~POLLIN);
+                }
             }
 
             foreach my $handle ($self->{_poll}->handles(POLLOUT)) {
@@ -123,6 +128,15 @@ sub start {
                     my $process = $self->{_procs}->{$handle};
                     $self->handle_proc_input($process, $handle);
                 }
+                else {
+                    # Output will not be writting, so mask out poll event.
+                    my $mask = $self->{_poll}->mask($handle);
+                    $self->{_poll}->mask($handle, $mask & ~POLLOUT);
+                }
+            }
+
+            foreach my $handle ($self->{_poll}->handles(POLLNVAL | POLLHUP | POLLERR)) {
+                $self->{_poll}->remove($handle);
             }
         }
     }
@@ -234,7 +248,11 @@ sub is_muted {
 sub schedule_write {
     my ($self, $input, @ids) = @_;
     foreach my $id (@ids) {
-        push @{$self->{_writers}->{$id}}, $input;
+        my $process = $self->{_procs}->{$id};
+        if ($process) {
+            $self->{_poll}->mask($process->fh, POLLIN | POLLOUT);
+            push @{$self->{_writers}->{$id}}, $input;
+        }
     }
 }
 
@@ -242,7 +260,7 @@ sub register_process {
     my ($self, $process) = @_;
     eval {
         $self->{_proc_manager}->run_process($process);
-        $self->{_poll}->mask($process->fh, POLLIN | POLLOUT);
+        $self->{_poll}->mask($process->fh, POLLIN);
         $self->{_poll}->mask($process->errors, POLLIN);
         $self->{_procs}->{$process->fh} = $process;
         $self->{_procs}->{$process->id} = $process;
@@ -291,7 +309,7 @@ sub handle_proc_input {
     if (exists $self->{_writers}->{$process->id}
         and @{$self->{_writers}->{$process->id}} > 0)
     {
-        $self->{_logger}->debug('writing to ' . $process->id);
+        $self->{_poll}->mask($handle, POLLIN);
         my $input = shift @{$self->{_writers}->{$process->id}};
         print { $handle } "$input\n";
     }
