@@ -175,6 +175,19 @@
   (interactive (list (read-string "Command: " nil 'emux-command-history)))
   (emux-run-command-on command emux-working-machines))
 
+(defun emux-send-input-to (input ids tags)
+  (interactive
+   (list
+    (read-string "Input: " nil 'emux-input-history)
+    (emux--read-option-vector-string "Ids: " nil 'emux-ids-history)
+    (emux--read-option-vector-string "Tags: " nil 'emux-tags-history)))
+  (when (or
+         (> (length ids) 0)
+         (> (length tags) 0))
+    (emux-input :id ids
+                :tags tags
+                :input input)))
+
 (defun emux-set-working-machines (machines)
   (interactive
    (list
