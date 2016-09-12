@@ -75,68 +75,74 @@ sub start {
     for (;;) {
         # Readers.
         if ($self->{_poll}->poll > 0) {
-            foreach my $handle ($self->{_poll}->handles(POLLIN)) {
-                if ($self->is_listener($handle)) {
-                    my $client = $self->accept_client($handle);
-                    $self->{_logger}->info(
-                        'Accepted connection from %s', $client->from);
-                    $self->{_poll}->mask($client->fh, POLLIN);
-                    $self->{_clients}->{$client->fh} = $client;
-                }
-                elsif ($self->is_proc_fh($handle)) {
-                    my $process = $self->{_procs}->{$handle};
-                    $self->handle_proc_output(
-                        TYPE_OUTPUT, $process, $handle);
-                }
-                elsif ($self->is_proc_error_fh($handle)) {
-                    my $process = $self->{_proc_errors}->{$handle};
-                    $self->handle_proc_output(
-                        TYPE_ERROR_OUTPUT, $process, $handle);
-                }
-                elsif (my $client = $self->{_clients}->{$handle}) {
-                    my ($message, $error);
-                    eval {
-                        if ($client->connected) {
-                            $message = $client->receive($self->{_cmd_factory});
-                            $message->command->execute
-                                if $message and $message->command;
+            foreach my $handle ($self->{_poll}->handles) {
+                my $mask = $self->{_poll}->events($handle);
+                if ($mask & POLLIN) {
+                    if ($self->is_listener($handle)) {
+                        my $client = $self->accept_client($handle);
+                        $self->{_logger}->info(
+                            'Accepted connection from %s', $client->from);
+                        $self->{_poll}->mask($client->fh, POLLIN);
+                        $self->{_clients}->{$client->fh} = $client;
+                    }
+                    elsif ($self->is_proc_fh($handle)) {
+                        my $process = $self->{_procs}->{$handle};
+                        $self->handle_proc_output(
+                            TYPE_OUTPUT, $process, $handle);
+                    }
+                    elsif ($self->is_proc_error_fh($handle)) {
+                        my $process = $self->{_proc_errors}->{$handle};
+                        $self->handle_proc_output(
+                            TYPE_ERROR_OUTPUT, $process, $handle);
+                    }
+                    elsif (my $client = $self->{_clients}->{$handle}) {
+                        my ($message, $error);
+                        eval {
+                            if ($client->connected) {
+                                $message = $client->receive($self->{_cmd_factory});
+                                $message->command->execute
+                                    if $message and $message->command;
+                            }
+                            else {
+                                $self->disconnect($handle);
+                            }
+                            1;
+                        } or do {
+                            $error = $@;
+                        };
+
+                        if ($error) {
+                            $self->{_logger}->err("error processing message: $error");
                         }
-                        else {
+                        elsif (not ($message and $message->command) and not $client->connected) {
                             $self->disconnect($handle);
                         }
-                        1;
-                    } or do {
-                        $error = $@;
-                    };
-
-                    if ($error) {
-                        $self->{_logger}->err("error processing message: $error");
                     }
-                    elsif (not ($message and $message->command) and not $client->connected) {
-                        $self->disconnect($handle);
+                    else {
+                        # Input will not be read, so mask out poll event.
+                        my $mask = $self->{_poll}->mask($handle);
+                        $self->{_poll}->mask($handle, $mask & ~POLLIN);
                     }
                 }
-                else {
-                    # Input will not be read, so mask out poll event.
-                    my $mask = $self->{_poll}->mask($handle);
-                    $self->{_poll}->mask($handle, $mask & ~POLLIN);
-                }
-            }
 
-            foreach my $handle ($self->{_poll}->handles(POLLOUT)) {
-                if ($self->is_proc_fh($handle)) {
-                    my $process = $self->{_procs}->{$handle};
-                    $self->handle_proc_input($process, $handle);
+                if ($mask & POLLOUT) {
+                    if ($self->is_proc_fh($handle)) {
+                        my $process = $self->{_procs}->{$handle};
+                        $self->handle_proc_input($process, $handle);
+                    }
+                    else {
+                        # Output will not be writting, so mask out poll event.
+                        my $mask = $self->{_poll}->mask($handle);
+                        $self->{_poll}->mask($handle, $mask & ~POLLOUT);
+                    }
                 }
-                else {
-                    # Output will not be writting, so mask out poll event.
-                    my $mask = $self->{_poll}->mask($handle);
-                    $self->{_poll}->mask($handle, $mask & ~POLLOUT);
-                }
-            }
 
-            foreach my $handle ($self->{_poll}->handles(POLLNVAL | POLLHUP | POLLERR)) {
-                $self->{_poll}->remove($handle);
+                if ($mask & (POLLNVAL | POLLHUP | POLLERR)) {
+                    $self->{_logger}->debug(
+                        'removing handle from poll; fileno ' . fileno($handle));
+                    $self->{_poll}->mask(0);
+                    $self->{_poll}->remove($handle);
+                }
             }
         }
     }
