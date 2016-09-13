@@ -72,8 +72,8 @@
 
 (defun emux--broadcast (kind id data)
   ;; just a hack for now
-  (when (functionp 'emux--repl-handle-output)
-    (emux--repl-handle-output kind id data)))
+  (when (functionp 'emux--shell-handle-output)
+    (emux--shell-handle-output kind id data)))
 
 (emux--defresponse-type finished ((id string) (tags (vector string)) (exit_code integer))
   (emux--broadcast 'finished id exit_code)
