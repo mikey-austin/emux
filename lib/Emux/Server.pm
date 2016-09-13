@@ -121,7 +121,7 @@ sub start {
                     else {
                         # Input will not be read, so mask out poll event.
                         my $mask = $self->{_poll}->mask($handle);
-                        $self->{_poll}->mask($handle, $mask & ~POLLIN);
+                        $self->{_poll}->mask($handle, defined $mask ? $mask & ~POLLIN : 0);
                     }
                 }
 
@@ -133,7 +133,7 @@ sub start {
                     else {
                         # Output will not be writting, so mask out poll event.
                         my $mask = $self->{_poll}->mask($handle);
-                        $self->{_poll}->mask($handle, $mask & ~POLLOUT);
+                        $self->{_poll}->mask($handle, defined $mask ? $mask & ~POLLOUT : 0);
                     }
                 }
 
