@@ -56,9 +56,15 @@ sub log_message {
     $priority ||= 'warning';
 
     if ($self->{_syslog}) {
-        openlog('emux', 'cons,pid', 'user');
-        syslog($priority, '%s', $message);
-        closelog();
+        eval {
+            openlog('emux', 'cons,pid', 'user');
+            syslog($priority, '%s', $message);
+            closelog();
+            1;
+        } or do {
+            my $error = $@;
+            warn "Could not write to syslog: $error";
+        };
     }
     elsif ($self->{_stderr}) {
         my $timestamp = strftime "%F %T", localtime;
