@@ -51,6 +51,11 @@ sub prefix {
     $self->{_prefix} = $prefix ? 1 : 0;
 }
 
+sub warn {
+    my $self = shift;
+    $self->warning(@_);
+}
+
 sub log_message {
     my ($self, $message, $priority) = @_;
     $priority ||= 'warning';
@@ -63,7 +68,7 @@ sub log_message {
             1;
         } or do {
             my $error = $@;
-            warn "Could not write to syslog: $error";
+            CORE::warn "Could not write to syslog: $error";
         };
     }
     elsif ($self->{_stderr}) {
