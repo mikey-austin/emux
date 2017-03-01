@@ -20,7 +20,7 @@ sub new {
     $self->logger($self->{_config}->get('logger'))
         if defined $self->{_config}->get('logger');
 
-    foreach my $level (qw/err warn info debug/) {
+    foreach my $level (qw/err warning info debug/) {
         no strict 'refs';
         *{"${class}::$level"} = sub {
             my $self = shift;
@@ -56,9 +56,15 @@ sub log_message {
     $priority ||= 'warning';
 
     if ($self->{_syslog}) {
-        openlog('emux', 'cons,pid', 'user');
-        syslog($priority, '%s', $message);
-        closelog();
+        eval {
+            openlog('emux', 'cons,pid', 'user');
+            syslog($priority, '%s', $message);
+            closelog();
+            1;
+        } or do {
+            my $error = $@;
+            warn "Could not write to syslog: $error";
+        };
     }
     elsif ($self->{_stderr}) {
         my $timestamp = strftime "%F %T", localtime;

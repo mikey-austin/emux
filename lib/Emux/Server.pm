@@ -358,19 +358,19 @@ sub daemonize {
     my $self = shift;
 
     # Log to syslog.
-    if ($self->{_config}->set('logger') ne 'syslog') {
+    if ($self->{_config}->get('logger') ne 'syslog') {
         $self->{_logger}->force_syslog;
         $self->{_logger}->warn('forced logger to syslog');
     }
 
     # Drop privileges.
-    if (defined $self->{_config}->get('user')) {
+    if ($self->{_config}->get('user')) {
         my $uid = getpwnam($self->{_config}->get('user'));
         POSIX::setuid($uid)
             or die "Could not setuid to $uid, exiting...";
     }
 
-    if (defined $self->{_config}->get('group')) {
+    if ($self->{_config}->get('group')) {
         my $gid = getgrnam($self->{_config}->get('group'));
         POSIX::setgid($gid)
             or die "Could not setgid to $gid, exiting...";
